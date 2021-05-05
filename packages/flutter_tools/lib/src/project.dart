@@ -574,7 +574,9 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
       info.reportFlavorNotFoundAndExit();
     }
 
-    return _buildSettingsByScheme[scheme] ??= await _xcodeProjectBuildSettings(scheme);
+    final String configuration = info.buildConfigurationFor(buildInfo, scheme);
+
+    return _buildSettingsByScheme[scheme] ??= await _xcodeProjectBuildSettings(scheme, configuration);
   }
   Map<String, Map<String, String>> _buildSettingsByScheme;
 
@@ -586,13 +588,14 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
   }
   XcodeProjectInfo _projectInfo;
 
-  Future<Map<String, String>> _xcodeProjectBuildSettings(String scheme) async {
+  Future<Map<String, String>> _xcodeProjectBuildSettings(String scheme, String configuration) async {
     if (!globals.xcodeProjectInterpreter.isInstalled) {
       return null;
     }
     final Map<String, String> buildSettings = await globals.xcodeProjectInterpreter.getBuildSettings(
       xcodeProject.path,
       scheme: scheme,
+      configuration: configuration
     );
     if (buildSettings != null && buildSettings.isNotEmpty) {
       // No timeouts, flakes, or errors.
