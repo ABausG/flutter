@@ -194,7 +194,7 @@ class StackFrame {
       line != '===== asynchronous gap ===========================',
       'Got a stack frame from package:stack_trace, where a vm or web frame was expected. '
       'This can happen if FlutterError.demangleStackTrace was not set in an environment '
-      'that propagates non-standard stack traces to the framework, such as during tests.'
+      'that propagates non-standard stack traces to the framework, such as during tests.',
     );
 
     // Web frames.
@@ -211,7 +211,9 @@ class StackFrame {
     String className = '';
     String method = match.group(2)!.replaceAll('.<anonymous closure>', '');
     if (method.startsWith('new')) {
-      className = method.split(' ')[1];
+      final List<String> methodParts = method.split(' ');
+      // Sometimes a web frame will only read "new" and have no class name.
+      className = methodParts.length > 1 ? method.split(' ')[1] : '<unknown>';
       method = '';
       if (className.contains('.')) {
         final List<String> parts  = className.split('.');

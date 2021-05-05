@@ -126,7 +126,6 @@ class PaintingContext extends ClipContext {
       // layer for repaint boundaries.
       child._layer = childLayer = OffsetLayer();
     } else {
-      assert(childLayer is OffsetLayer);
       assert(debugAlsoPaintedParent || childLayer.attached);
       childLayer.removeAllChildren();
     }
@@ -177,8 +176,7 @@ class PaintingContext extends ClipContext {
     assert(() {
       if (debugProfilePaintsEnabled)
         Timeline.startSync('${child.runtimeType}', arguments: timelineArgumentsIndicatingLandmarkEvent);
-      if (debugOnProfilePaint != null)
-        debugOnProfilePaint!(child);
+      debugOnProfilePaint?.call(child);
       return true;
     }());
 
@@ -365,7 +363,7 @@ class PaintingContext extends ClipContext {
   /// object, rather than reusing an existing layer, satisfies that
   /// requirement.)
   ///
-  /// {@template flutter.rendering.object.pushLayer.offset}
+  /// {@template flutter.rendering.PaintingContext.pushLayer.offset}
   /// The `offset` is the offset to pass to the `painter`. In particular, it is
   /// not an offset applied to the layer itself. Layers conceptually by default
   /// have no position or size, though they can transform their contents. For
@@ -407,7 +405,7 @@ class PaintingContext extends ClipContext {
 
   /// Clip further painting using a rectangle.
   ///
-  /// {@template flutter.rendering.object.needsCompositing}
+  /// {@template flutter.rendering.PaintingContext.pushClipRect.needsCompositing}
   /// The `needsCompositing` argument specifies whether the child needs
   /// compositing. Typically this matches the value of
   /// [RenderObject.needsCompositing] for the caller. If false, this method
@@ -419,7 +417,7 @@ class PaintingContext extends ClipContext {
   /// way to apply the layer effect than actually creating a layer.
   /// {@endtemplate}
   ///
-  /// {@template flutter.rendering.object.pushClipLayer.offset}
+  /// {@template flutter.rendering.PaintingContext.pushClipRect.offset}
   /// The `offset` argument is the offset from the origin of the canvas'
   /// coordinate system to the origin of the caller's coordinate system.
   /// {@endtemplate}
@@ -433,7 +431,7 @@ class PaintingContext extends ClipContext {
   ///
   /// The `clipBehavior` argument controls how the rectangle is clipped.
   ///
-  /// {@template flutter.rendering.object.oldLayer}
+  /// {@template flutter.rendering.PaintingContext.pushClipRect.oldLayer}
   /// For the `oldLayer` argument, specify the layer created in the previous
   /// frame. This gives the engine more information for performance
   /// optimizations. Typically this is the value of [RenderObject.layer] that a
@@ -459,9 +457,9 @@ class PaintingContext extends ClipContext {
 
   /// Clip further painting using a rounded rectangle.
   ///
-  /// {@macro flutter.rendering.object.needsCompositing}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.needsCompositing}
   ///
-  /// {@macro flutter.rendering.object.pushClipLayer.offset}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.offset}
   ///
   /// The `bounds` argument is used to specify the region of the canvas (in the
   /// caller's coordinate system) into which `painter` will paint.
@@ -475,7 +473,7 @@ class PaintingContext extends ClipContext {
   ///
   /// The `clipBehavior` argument controls how the rounded rectangle is clipped.
   ///
-  /// {@macro flutter.rendering.object.oldLayer}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.oldLayer}
   ClipRRectLayer? pushClipRRect(bool needsCompositing, Offset offset, Rect bounds, RRect clipRRect, PaintingContextCallback painter, { Clip clipBehavior = Clip.antiAlias, ClipRRectLayer? oldLayer }) {
     assert(clipBehavior != null);
     final Rect offsetBounds = bounds.shift(offset);
@@ -495,9 +493,9 @@ class PaintingContext extends ClipContext {
 
   /// Clip further painting using a path.
   ///
-  /// {@macro flutter.rendering.object.needsCompositing}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.needsCompositing}
   ///
-  /// {@macro flutter.rendering.object.pushClipLayer.offset}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.offset}
   ///
   /// The `bounds` argument is used to specify the region of the canvas (in the
   /// caller's coordinate system) into which `painter` will paint.
@@ -511,7 +509,7 @@ class PaintingContext extends ClipContext {
   ///
   /// The `clipBehavior` argument controls how the path is clipped.
   ///
-  /// {@macro flutter.rendering.object.oldLayer}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.oldLayer}
   ClipPathLayer? pushClipPath(bool needsCompositing, Offset offset, Rect bounds, Path clipPath, PaintingContextCallback painter, { Clip clipBehavior = Clip.antiAlias, ClipPathLayer? oldLayer }) {
     assert(clipBehavior != null);
     final Rect offsetBounds = bounds.shift(offset);
@@ -531,7 +529,7 @@ class PaintingContext extends ClipContext {
 
   /// Blend further painting with a color filter.
   ///
-  /// {@macro flutter.rendering.object.pushLayer.offset}
+  /// {@macro flutter.rendering.PaintingContext.pushLayer.offset}
   ///
   /// The `colorFilter` argument is the [ColorFilter] value to use when blending
   /// the painting done by `painter`.
@@ -539,7 +537,7 @@ class PaintingContext extends ClipContext {
   /// The `painter` callback will be called while the `colorFilter` is applied.
   /// It is called synchronously during the call to [pushColorFilter].
   ///
-  /// {@macro flutter.rendering.object.oldLayer}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.oldLayer}
   ///
   /// A [RenderObject] that uses this function is very likely to require its
   /// [RenderObject.alwaysNeedsCompositing] property to return true. That informs
@@ -555,7 +553,7 @@ class PaintingContext extends ClipContext {
 
   /// Transform further painting using a matrix.
   ///
-  /// {@macro flutter.rendering.object.needsCompositing}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.needsCompositing}
   ///
   /// The `offset` argument is the offset to pass to `painter` and the offset to
   /// the origin used by `transform`.
@@ -567,7 +565,7 @@ class PaintingContext extends ClipContext {
   /// The `painter` callback will be called while the `transform` is applied. It
   /// is called synchronously during the call to [pushTransform].
   ///
-  /// {@macro flutter.rendering.object.oldLayer}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.oldLayer}
   TransformLayer? pushTransform(bool needsCompositing, Offset offset, Matrix4 transform, PaintingContextCallback painter, { TransformLayer? oldLayer }) {
     final Matrix4 effectiveTransform = Matrix4.translationValues(offset.dx, offset.dy, 0.0)
       ..multiply(transform)..translate(-offset.dx, -offset.dy);
@@ -603,7 +601,7 @@ class PaintingContext extends ClipContext {
   /// The `painter` callback will be called while the `alpha` is applied. It
   /// is called synchronously during the call to [pushOpacity].
   ///
-  /// {@macro flutter.rendering.object.oldLayer}
+  /// {@macro flutter.rendering.PaintingContext.pushClipRect.oldLayer}
   ///
   /// A [RenderObject] that uses this function is very likely to require its
   /// [RenderObject.alwaysNeedsCompositing] property to return true. That informs
@@ -831,8 +829,7 @@ class PipelineOwner {
   /// Used to notify the pipeline owner that an associated render object wishes
   /// to update its visual appearance.
   void requestVisualUpdate() {
-    if (onNeedVisualUpdate != null)
-      onNeedVisualUpdate!();
+    onNeedVisualUpdate?.call();
   }
 
   /// The unique object managed by this pipeline that has no parent.
@@ -1030,8 +1027,7 @@ class PipelineOwner {
     if (_outstandingSemanticsHandles == 1) {
       assert(_semanticsOwner == null);
       _semanticsOwner = SemanticsOwner();
-      if (onSemanticsOwnerCreated != null)
-        onSemanticsOwnerCreated!();
+      onSemanticsOwnerCreated?.call();
     }
     return SemanticsHandle._(this, listener);
   }
@@ -1042,8 +1038,7 @@ class PipelineOwner {
     if (_outstandingSemanticsHandles == 0) {
       _semanticsOwner!.dispose();
       _semanticsOwner = null;
-      if (onSemanticsOwnerDisposed != null)
-        onSemanticsOwnerDisposed!();
+      onSemanticsOwnerDisposed?.call();
     }
   }
 
@@ -1305,6 +1300,10 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// The object responsible for creating this render object.
   ///
   /// Used in debug messages.
+  ///
+  /// See also:
+  ///
+  ///  * [DebugCreator], which the [widgets] library uses as values for this field.
   Object? debugCreator;
 
   void _debugReportException(String method, Object exception, StackTrace stack) {
@@ -1441,6 +1440,9 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   bool _needsLayout = true;
 
   RenderObject? _relayoutBoundary;
+
+  /// Whether [invokeLayoutCallback] for this render object is currently running.
+  bool get debugDoingThisLayoutWithCallback => _doingThisLayoutWithCallback;
   bool _doingThisLayoutWithCallback = false;
 
   /// The layout constraints most recently supplied by the parent.
@@ -1695,7 +1697,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
             "These invalid constraints were provided to $runtimeType's layout() "
             'function by the following function, which probably computed the '
             'invalid constraints in question:\n'
-            '  $problemFunction'
+            '  $problemFunction',
           );
         }
       },
@@ -1818,10 +1820,12 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   ///
   /// Subclasses that return true must not change the dimensions of this render
   /// object in [performLayout]. Instead, that work should be done by
-  /// [performResize].
+  /// [performResize] or - for subclasses of [RenderBox] - in
+  /// [RenderBox.computeDryLayout].
   @protected
   bool get sizedByParent => false;
 
+  /// {@template flutter.rendering.RenderObject.performResize}
   /// Updates the render objects size using only the constraints.
   ///
   /// Do not call this function directly: call [layout] instead. This function
@@ -1829,10 +1833,12 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// render object during layout. The layout constraints provided by your
   /// parent are available via the [constraints] getter.
   ///
-  /// Subclasses that set [sizedByParent] to true should override this method
-  /// to compute their size.
-  ///
   /// This function is called only if [sizedByParent] is true.
+  /// {@endtemplate}
+  ///
+  /// Subclasses that set [sizedByParent] to true should override this method to
+  /// compute their size. Subclasses of [RenderBox] should consider overriding
+  /// [RenderBox.computeDryLayout] instead.
   @protected
   void performResize();
 
@@ -2225,11 +2231,11 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
           ErrorSummary('Tried to paint a RenderObject reentrantly.'),
           describeForError(
             'The following RenderObject was already being painted when it was '
-            'painted again'
+            'painted again',
           ),
           ErrorDescription(
             'Since this typically indicates an infinite recursion, it is '
-            'disallowed.'
+            'disallowed.',
           ),
         ]);
       }
@@ -2264,15 +2270,15 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
                 'The parent was',
               ),
               describeForError(
-                'The child that was not visited was'
+                'The child that was not visited was',
               ),
               ErrorDescription(
                 'A RenderObject with children must implement visitChildren and '
                 'call the visitor exactly once for each child; it also should not '
-                'paint children that were removed with dropChild.'
+                'paint children that were removed with dropChild.',
               ),
               ErrorHint(
-                'This usually indicates an error in the Flutter framework itself.'
+                'This usually indicates an error in the Flutter framework itself.',
               ),
             ]);
           }
@@ -2280,7 +2286,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
         throw FlutterError.fromParts(<DiagnosticsNode>[
           ErrorSummary(
             'Tried to paint a RenderObject before its compositing bits were '
-            'updated.'
+            'updated.',
           ),
           describeForError(
             'The following RenderObject was marked as having dirty compositing '
@@ -2289,10 +2295,10 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
           ErrorDescription(
             'A RenderObject that still has dirty compositing bits cannot be '
             'painted because this indicates that the tree has not yet been '
-            'properly configured for creating the layer tree.'
+            'properly configured for creating the layer tree.',
           ),
           ErrorHint(
-            'This usually indicates an error in the Flutter framework itself.'
+            'This usually indicates an error in the Flutter framework itself.',
           ),
         ]);
       }
@@ -2977,7 +2983,7 @@ mixin RenderObjectWithChildMixin<ChildType extends RenderObject> on RenderObject
         throw FlutterError.fromParts(<DiagnosticsNode>[
           ErrorSummary(
             'A $runtimeType expected a child of type $ChildType but received a '
-            'child of type ${child.runtimeType}.'
+            'child of type ${child.runtimeType}.',
           ),
           ErrorDescription(
             'RenderObjects expect specific types of children because they '
@@ -3123,13 +3129,13 @@ mixin ContainerRenderObjectMixin<ChildType extends RenderObject, ParentDataType 
         throw FlutterError.fromParts(<DiagnosticsNode>[
           ErrorSummary(
             'A $runtimeType expected a child of type $ChildType but received a '
-            'child of type ${child.runtimeType}.'
+            'child of type ${child.runtimeType}.',
           ),
           ErrorDescription(
             'RenderObjects expect specific types of children because they '
             'coordinate with their children during layout and paint. For '
             'example, a RenderSliver cannot be the child of a RenderBox because '
-            'a RenderSliver does not understand the RenderBox layout protocol.'
+            'a RenderSliver does not understand the RenderBox layout protocol.',
           ),
           ErrorSpacer(),
           DiagnosticsProperty<Object?>(

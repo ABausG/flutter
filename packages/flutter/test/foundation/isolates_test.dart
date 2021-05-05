@@ -2,11 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-@TestOn('!chrome') // isolates not supported on the web.
-
 import 'package:flutter/foundation.dart';
-
-import '../flutter_test_alternative.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 int test1(int value) {
   return value + 1;
@@ -31,5 +28,5 @@ void main() {
 
     expect(await compute(test1Async, 0), 1);
     expect(compute(test2Async, 0), throwsException);
-  });
+  }, skip: kIsWeb);
 }

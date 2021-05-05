@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'package:flutter/material.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -233,9 +232,9 @@ void main() {
                 },
                 child: null,
               ),
-              Material(
+              const Material(
                 type: MaterialType.transparency,
-                child: Container(
+                child: SizedBox(
                   width: 400.0,
                   height: 500.0,
                 ),
@@ -354,6 +353,35 @@ void main() {
           child: buildMaterial(
             color: surfaceColor.withOpacity(.75),
             elevation: 8.0,
+          ),
+        ),
+      );
+
+      final RenderPhysicalShape model = getModel(tester);
+      expect(model.color, equals(surfaceColorWithOverlay));
+      expect(model.color, isNot(equals(surfaceColor)));
+    });
+
+    testWidgets('Expected overlay color can be computed using colorWithOverlay', (WidgetTester tester) async {
+      const Color surfaceColor = Color(0xFF123456);
+      const Color onSurfaceColor = Color(0xFF654321);
+      const double elevation = 8.0;
+
+      final Color surfaceColorWithOverlay =
+        ElevationOverlay.colorWithOverlay(surfaceColor, onSurfaceColor, elevation);
+
+      await tester.pumpWidget(
+        Theme(
+          data: ThemeData(
+            applyElevationOverlayColor: true,
+            colorScheme: const ColorScheme.dark(
+              surface: surfaceColor,
+              onSurface: onSurfaceColor,
+            ),
+          ),
+          child: buildMaterial(
+            color: surfaceColor,
+            elevation: elevation,
           ),
         ),
       );

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.9
 import 'dart:html';
 import 'dart:js_util' as js_util;
 import 'package:flutter/gestures.dart';
@@ -143,9 +144,7 @@ void main() {
     expect(input2.value, 'Text2');
   });
 
-  testWidgets('Jump between TextFormFields with tab key after CapsLock is'
-      'activated',
-          (WidgetTester tester) async {
+  testWidgets('Jump between TextFormFields with tab key after CapsLock is activated', (WidgetTester tester) async {
     app.main();
     await tester.pumpAndSettle();
 

@@ -5,7 +5,6 @@
 import 'dart:collection';
 import 'dart:math' as math;
 
-import 'package:flutter/animation.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -13,6 +12,7 @@ import 'package:flutter/scheduler.dart';
 import 'basic.dart';
 import 'framework.dart';
 import 'notification_listener.dart';
+import 'scroll_configuration.dart';
 import 'scroll_context.dart';
 import 'scroll_controller.dart';
 import 'scroll_metrics.dart';
@@ -165,7 +165,7 @@ class ListWheelChildBuilderDelegate extends ListWheelChildDelegate {
   /// Called lazily to build children.
   final NullableIndexedWidgetBuilder builder;
 
-  /// {@template flutter.widgets.wheelList.childCount}
+  /// {@template flutter.widgets.ListWheelChildBuilderDelegate.childCount}
   /// If non-null, [childCount] is the maximum number of children that can be
   /// provided, and children are available from 0 to [childCount] - 1.
   ///
@@ -373,7 +373,7 @@ class _FixedExtentScrollPosition extends ScrollPositionWithSingleContext impleme
     String? debugLabel,
   }) : assert(
          context is _FixedExtentScrollableState,
-         'FixedExtentScrollController can only be used with ListWheelScrollViews'
+         'FixedExtentScrollController can only be used with ListWheelScrollViews',
        ),
        super(
          physics: physics,
@@ -432,6 +432,7 @@ class _FixedExtentScrollable extends Scrollable {
     required this.itemExtent,
     required ViewportBuilder viewportBuilder,
     String? restorationId,
+    ScrollBehavior? scrollBehavior,
   }) : super (
     key: key,
     axisDirection: axisDirection,
@@ -439,6 +440,7 @@ class _FixedExtentScrollable extends Scrollable {
     physics: physics,
     viewportBuilder: viewportBuilder,
     restorationId: restorationId,
+    scrollBehavior: scrollBehavior,
   );
 
   final double itemExtent;
@@ -481,7 +483,7 @@ class FixedExtentScrollPhysics extends ScrollPhysics {
     assert(
       position is _FixedExtentScrollPosition,
       'FixedExtentScrollPhysics can only be used with Scrollables that uses '
-      'the FixedExtentScrollController'
+      'the FixedExtentScrollController',
     );
 
     final _FixedExtentScrollPosition metrics = position as _FixedExtentScrollPosition;
@@ -585,6 +587,7 @@ class ListWheelScrollView extends StatefulWidget {
     this.renderChildrenOutsideViewport = false,
     this.clipBehavior = Clip.hardEdge,
     this.restorationId,
+    this.scrollBehavior,
     required List<Widget> children,
   }) : assert(children != null),
        assert(diameterRatio != null),
@@ -626,6 +629,7 @@ class ListWheelScrollView extends StatefulWidget {
     this.renderChildrenOutsideViewport = false,
     this.clipBehavior = Clip.hardEdge,
     this.restorationId,
+    this.scrollBehavior,
     required this.childDelegate,
   }) : assert(childDelegate != null),
        assert(diameterRatio != null),
@@ -670,32 +674,36 @@ class ListWheelScrollView extends StatefulWidget {
   /// For example, determines how the scroll view continues to animate after the
   /// user stops dragging the scroll view.
   ///
+  /// If an explicit [ScrollBehavior] is provided to [scrollBehavior], the
+  /// [ScrollPhysics] provided by that behavior will take precedence after
+  /// [physics].
+  ///
   /// Defaults to matching platform conventions.
   final ScrollPhysics? physics;
 
-  /// {@macro flutter.rendering.wheelList.diameterRatio}
+  /// {@macro flutter.rendering.RenderListWheelViewport.diameterRatio}
   final double diameterRatio;
 
-  /// {@macro flutter.rendering.wheelList.perspective}
+  /// {@macro flutter.rendering.RenderListWheelViewport.perspective}
   final double perspective;
 
-  /// {@macro flutter.rendering.wheelList.offAxisFraction}
+  /// {@macro flutter.rendering.RenderListWheelViewport.offAxisFraction}
   final double offAxisFraction;
 
-  /// {@macro flutter.rendering.wheelList.useMagnifier}
+  /// {@macro flutter.rendering.RenderListWheelViewport.useMagnifier}
   final bool useMagnifier;
 
-  /// {@macro flutter.rendering.wheelList.magnification}
+  /// {@macro flutter.rendering.RenderListWheelViewport.magnification}
   final double magnification;
 
-  /// {@macro flutter.rendering.wheelList.overAndUnderCenterOpacity}
+  /// {@macro flutter.rendering.RenderListWheelViewport.overAndUnderCenterOpacity}
   final double overAndUnderCenterOpacity;
 
   /// Size of each child in the main axis. Must not be null and must be
   /// positive.
   final double itemExtent;
 
-  /// {@macro flutter.rendering.wheelList.squeeze}
+  /// {@macro flutter.rendering.RenderListWheelViewport.squeeze}
   ///
   /// Defaults to 1.
   final double squeeze;
@@ -703,19 +711,30 @@ class ListWheelScrollView extends StatefulWidget {
   /// On optional listener that's called when the centered item changes.
   final ValueChanged<int>? onSelectedItemChanged;
 
-  /// {@macro flutter.rendering.wheelList.renderChildrenOutsideViewport}
+  /// {@macro flutter.rendering.RenderListWheelViewport.renderChildrenOutsideViewport}
   final bool renderChildrenOutsideViewport;
 
   /// A delegate that helps lazily instantiating child.
   final ListWheelChildDelegate childDelegate;
 
-  /// {@macro flutter.widgets.Clip}
+  /// {@macro flutter.material.Material.clipBehavior}
   ///
   /// Defaults to [Clip.hardEdge].
   final Clip clipBehavior;
 
   /// {@macro flutter.widgets.scrollable.restorationId}
   final String? restorationId;
+
+  /// {@macro flutter.widgets.shadow.scrollBehavior}
+  ///
+  /// [ScrollBehavior]s also provide [ScrollPhysics]. If an explicit
+  /// [ScrollPhysics] is provided in [physics], it will take precedence,
+  /// followed by [scrollBehavior], and then the inherited ancestor
+  /// [ScrollBehavior].
+  ///
+  /// The [ScrollBehavior] of the inherited [ScrollConfiguration] will be
+  /// modified by default to not apply a [Scrollbar].
+  final ScrollBehavior? scrollBehavior;
 
   @override
   _ListWheelScrollViewState createState() => _ListWheelScrollViewState();
@@ -770,6 +789,7 @@ class _ListWheelScrollViewState extends State<ListWheelScrollView> {
         physics: widget.physics,
         itemExtent: widget.itemExtent,
         restorationId: widget.restorationId,
+        scrollBehavior: widget.scrollBehavior ?? ScrollConfiguration.of(context).copyWith(scrollbars: false),
         viewportBuilder: (BuildContext context, ViewportOffset offset) {
           return ListWheelViewport(
             diameterRatio: widget.diameterRatio,
@@ -890,12 +910,12 @@ class ListWheelElement extends RenderObjectElement implements ListWheelChildMana
   }
 
   @override
-  Element? updateChild(Element? child, Widget? newWidget, dynamic newSlot) {
+  Element? updateChild(Element? child, Widget? newWidget, Object? newSlot) {
     final ListWheelParentData? oldParentData = child?.renderObject?.parentData as ListWheelParentData?;
     final Element? newChild = super.updateChild(child, newWidget, newSlot);
     final ListWheelParentData? newParentData = newChild?.renderObject?.parentData as ListWheelParentData?;
     if (newParentData != null) {
-      newParentData.index = newSlot as int;
+      newParentData.index = newSlot! as int;
       if (oldParentData != null)
         newParentData.offset = oldParentData.offset;
     }
@@ -1002,33 +1022,33 @@ class ListWheelViewport extends RenderObjectWidget {
        ),
        super(key: key);
 
-  /// {@macro flutter.rendering.wheelList.diameterRatio}
+  /// {@macro flutter.rendering.RenderListWheelViewport.diameterRatio}
   final double diameterRatio;
 
-  /// {@macro flutter.rendering.wheelList.perspective}
+  /// {@macro flutter.rendering.RenderListWheelViewport.perspective}
   final double perspective;
 
-  /// {@macro flutter.rendering.wheelList.offAxisFraction}
+  /// {@macro flutter.rendering.RenderListWheelViewport.offAxisFraction}
   final double offAxisFraction;
 
-  /// {@macro flutter.rendering.wheelList.useMagnifier}
+  /// {@macro flutter.rendering.RenderListWheelViewport.useMagnifier}
   final bool useMagnifier;
 
-  /// {@macro flutter.rendering.wheelList.magnification}
+  /// {@macro flutter.rendering.RenderListWheelViewport.magnification}
   final double magnification;
 
-  /// {@macro flutter.rendering.wheelList.overAndUnderCenterOpacity}
+  /// {@macro flutter.rendering.RenderListWheelViewport.overAndUnderCenterOpacity}
   final double overAndUnderCenterOpacity;
 
-  /// {@macro flutter.rendering.wheelList.itemExtent}
+  /// {@macro flutter.rendering.RenderListWheelViewport.itemExtent}
   final double itemExtent;
 
-  /// {@macro flutter.rendering.wheelList.squeeze}
+  /// {@macro flutter.rendering.RenderListWheelViewport.squeeze}
   ///
   /// Defaults to 1.
   final double squeeze;
 
-  /// {@macro flutter.rendering.wheelList.renderChildrenOutsideViewport}
+  /// {@macro flutter.rendering.RenderListWheelViewport.renderChildrenOutsideViewport}
   final bool renderChildrenOutsideViewport;
 
   /// [ViewportOffset] object describing the content that should be visible
@@ -1038,7 +1058,7 @@ class ListWheelViewport extends RenderObjectWidget {
   /// A delegate that lazily instantiates children.
   final ListWheelChildDelegate childDelegate;
 
-  /// {@macro flutter.widgets.Clip}
+  /// {@macro flutter.material.Material.clipBehavior}
   ///
   /// Defaults to [Clip.hardEdge].
   final Clip clipBehavior;

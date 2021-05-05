@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:async';
 
 import 'package:meta/meta.dart';
@@ -9,6 +11,7 @@ import 'package:process/process.dart';
 
 import '../artifacts.dart';
 import '../base/common.dart';
+import '../base/file_system.dart';
 import '../base/io.dart';
 import '../base/logger.dart';
 import '../base/platform.dart';
@@ -87,15 +90,21 @@ class IOSDeploy {
   Future<int> installApp({
     @required String deviceId,
     @required String bundlePath,
+    @required Directory appDeltaDirectory,
     @required List<String>launchArguments,
     @required IOSDeviceInterface interfaceType,
   }) async {
+    appDeltaDirectory?.createSync(recursive: true);
     final List<String> launchCommand = <String>[
       _binaryPath,
       '--id',
       deviceId,
       '--bundle',
       bundlePath,
+      if (appDeltaDirectory != null) ...<String>[
+        '--app_deltas',
+        appDeltaDirectory.path,
+      ],
       if (interfaceType != IOSDeviceInterface.network)
         '--no-wifi',
       if (launchArguments.isNotEmpty) ...<String>[
@@ -119,9 +128,11 @@ class IOSDeploy {
   IOSDeployDebugger prepareDebuggerForLaunch({
     @required String deviceId,
     @required String bundlePath,
+    @required Directory appDeltaDirectory,
     @required List<String> launchArguments,
     @required IOSDeviceInterface interfaceType,
   }) {
+    appDeltaDirectory?.createSync(recursive: true);
     // Interactive debug session to support sending the lldb detach command.
     final List<String> launchCommand = <String>[
       'script',
@@ -133,6 +144,10 @@ class IOSDeploy {
       deviceId,
       '--bundle',
       bundlePath,
+      if (appDeltaDirectory != null) ...<String>[
+        '--app_deltas',
+        appDeltaDirectory.path,
+      ],
       '--debug',
       if (interfaceType != IOSDeviceInterface.network)
         '--no-wifi',
@@ -155,15 +170,21 @@ class IOSDeploy {
   Future<int> launchApp({
     @required String deviceId,
     @required String bundlePath,
+    @required Directory appDeltaDirectory,
     @required List<String> launchArguments,
     @required IOSDeviceInterface interfaceType,
   }) async {
+    appDeltaDirectory?.createSync(recursive: true);
     final List<String> launchCommand = <String>[
       _binaryPath,
       '--id',
       deviceId,
       '--bundle',
       bundlePath,
+      if (appDeltaDirectory != null) ...<String>[
+        '--app_deltas',
+        appDeltaDirectory.path,
+      ],
       if (interfaceType != IOSDeviceInterface.network)
         '--no-wifi',
       '--justlaunch',
@@ -272,6 +293,9 @@ class IOSDeployDebugger {
   // https://github.com/ios-control/ios-deploy/blob/1.11.2-beta.1/src/ios-deploy/ios-deploy.m#L51
   static final RegExp _lldbProcessExit = RegExp(r'Process \d* exited with status =');
 
+  // (lldb) Process 6152 stopped
+  static final RegExp _lldbProcessStopped = RegExp(r'Process \d* stopped');
+
   /// Launch the app on the device, and attach the debugger.
   ///
   /// Returns whether or not the debugger successfully attached.
@@ -311,14 +335,12 @@ class IOSDeployDebugger {
         }
         if (line.contains('PROCESS_STOPPED') ||
             line.contains('PROCESS_EXITED') ||
-            _lldbProcessExit.hasMatch(line)) {
-          // The app exited or crashed, so stop echoing the output.
-          // Don't pass any further ios-deploy debugging messages to the log reader after it exits.
-          _debuggerState = _IOSDeployDebuggerState.detached;
+            _lldbProcessExit.hasMatch(line) ||
+            _lldbProcessStopped.hasMatch(line)) {
+          // The app exited or crashed, so exit. Continue passing debugging
+          // messages to the log reader until it exits to capture crash dumps.
           _logger.printTrace(line);
-          if (!debuggerCompleter.isCompleted) {
-            debuggerCompleter.complete(false);
-          }
+          exit();
           return;
         }
         if (_debuggerState != _IOSDeployDebuggerState.attached) {

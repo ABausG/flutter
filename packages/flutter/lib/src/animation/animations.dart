@@ -12,7 +12,7 @@ import 'curves.dart';
 import 'listener_helpers.dart';
 
 // Examples can assume:
-// AnimationController controller;
+// late AnimationController controller;
 
 class _AlwaysCompleteAnimation extends Animation<double> {
   const _AlwaysCompleteAnimation();
@@ -443,7 +443,7 @@ class CurvedAnimation extends Animation<double> with AnimationWithParentMixin<do
             'Invalid curve endpoint at $t.\n'
             'Curves must map 0.0 to near zero and 1.0 to near one but '
             '${activeCurve.runtimeType} mapped $t to $transformedValue, which '
-            'is near $roundedTransformedValue.'
+            'is near $roundedTransformedValue.',
           );
         }
         return true;

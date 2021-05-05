@@ -61,9 +61,6 @@ Future<void> run(List<String> arguments) async {
   print('$clock Test imports...');
   await verifyNoTestImports(flutterRoot);
 
-  print('$clock Test package imports...');
-  await verifyNoTestPackageImports(flutterRoot);
-
   print('$clock Bad imports (framework)...');
   await verifyNoBadImportsInFlutter(flutterRoot);
 
@@ -99,7 +96,7 @@ Future<void> run(List<String> arguments) async {
   // Analyze all the sample code in the repo
   print('$clock Sample code...');
   await runCommand(dart,
-    <String>[path.join(flutterRoot, 'dev', 'bots', 'analyze-sample-code.dart')],
+    <String>[path.join(flutterRoot, 'dev', 'bots', 'analyze_sample_code.dart')],
     workingDirectory: flutterRoot,
   );
 
@@ -129,9 +126,9 @@ Future<void> run(List<String> arguments) async {
 // TESTS
 
 final RegExp _findDeprecationPattern = RegExp(r'@[Dd]eprecated');
-final RegExp _deprecationPattern1 = RegExp(r'^( *)@Deprecated\($'); // ignore: flutter_deprecation_syntax (see analyze.dart)
+final RegExp _deprecationPattern1 = RegExp(r'^( *)@Deprecated\($'); // flutter_ignore: deprecation_syntax (see analyze.dart)
 final RegExp _deprecationPattern2 = RegExp(r"^ *'(.+) '$");
-final RegExp _deprecationPattern3 = RegExp(r"^ *'This feature was deprecated after v([0-9]+)\.([0-9]+)\.([0-9]+)(\-[0-9]+\.[0-9]+\.pre)?\.'$");
+final RegExp _deprecationPattern3 = RegExp(r"^ *'This feature was deprecated after v([0-9]+)\.([0-9]+)\.([0-9]+)(\-[0-9]+\.[0-9]+\.pre)?\.',?$");
 final RegExp _deprecationPattern4 = RegExp(r'^ *\)$');
 
 /// Some deprecation notices are special, for example they're used to annotate members that
@@ -139,14 +136,14 @@ final RegExp _deprecationPattern4 = RegExp(r'^ *\)$');
 /// (One example would be a library that intentionally conflicts with a member in another
 /// library to indicate that it is incompatible with that other library. Another would be
 /// the regexp just above...)
-const String _ignoreDeprecation = ' // ignore: flutter_deprecation_syntax (see analyze.dart)';
+const String _ignoreDeprecation = ' // flutter_ignore: deprecation_syntax (see analyze.dart)';
 
 /// Some deprecation notices are exempt for historical reasons. They must have an issue listed.
-final RegExp _legacyDeprecation = RegExp(r' // ignore: flutter_deprecation_syntax, https://github.com/flutter/flutter/issues/[0-9]+$');
+final RegExp _legacyDeprecation = RegExp(r' // flutter_ignore: deprecation_syntax, https://github.com/flutter/flutter/issues/[0-9]+$');
 
 Future<void> verifyDeprecations(String workingDirectory, { int minimumMatches = 2000 }) async {
   final List<String> errors = <String>[];
-  for (final File file in _allFiles(workingDirectory, 'dart', minimumMatches: minimumMatches)) {
+  await for (final File file in _allFiles(workingDirectory, 'dart', minimumMatches: minimumMatches)) {
     int lineNumber = 0;
     final List<String> lines = file.readAsLinesSync();
     final List<int> linesWithDeprecations = <int>[];
@@ -171,8 +168,13 @@ Future<void> verifyDeprecations(String workingDirectory, { int minimumMatches = 
         String message;
         do {
           final Match match2 = _deprecationPattern2.firstMatch(lines[lineNumber]);
-          if (match2 == null)
-            throw 'Deprecation notice does not match required pattern.';
+          if (match2 == null) {
+            String possibleReason = '';
+            if (lines[lineNumber].trimLeft().startsWith('"')) {
+              possibleReason = ' You might have used double quotes (") for the string instead of single quotes (\').';
+            }
+            throw 'Deprecation notice does not match required pattern.$possibleReason';
+          }
           if (!lines[lineNumber].startsWith("$indent  '"))
             throw 'Unexpected deprecation notice indent.';
           if (message == null) {
@@ -232,7 +234,7 @@ Future<void> verifyNoMissingLicense(String workingDirectory, { bool checkMinimum
   await _verifyNoMissingLicenseForExtension(workingDirectory, 'h', overrideMinimumMatches ?? 30, _generateLicense('// '));
   await _verifyNoMissingLicenseForExtension(workingDirectory, 'm', overrideMinimumMatches ?? 30, _generateLicense('// '));
   await _verifyNoMissingLicenseForExtension(workingDirectory, 'swift', overrideMinimumMatches ?? 10, _generateLicense('// '));
-  await _verifyNoMissingLicenseForExtension(workingDirectory, 'gradle', overrideMinimumMatches ?? 100, _generateLicense('// '));
+  await _verifyNoMissingLicenseForExtension(workingDirectory, 'gradle', overrideMinimumMatches ?? 80, _generateLicense('// '));
   await _verifyNoMissingLicenseForExtension(workingDirectory, 'gn', overrideMinimumMatches ?? 0, _generateLicense('# '));
   await _verifyNoMissingLicenseForExtension(workingDirectory, 'sh', overrideMinimumMatches ?? 1, '#!/usr/bin/env bash\n' + _generateLicense('# '));
   await _verifyNoMissingLicenseForExtension(workingDirectory, 'bat', overrideMinimumMatches ?? 1, '@ECHO off\n' + _generateLicense('REM '));
@@ -245,7 +247,7 @@ Future<void> _verifyNoMissingLicenseForExtension(String workingDirectory, String
   assert(!license.endsWith('\n'));
   final String licensePattern = license + '\n' + (trailingBlank ? '\n' : '');
   final List<String> errors = <String>[];
-  for (final File file in _allFiles(workingDirectory, extension, minimumMatches: minimumMatches)) {
+  await for (final File file in _allFiles(workingDirectory, extension, minimumMatches: minimumMatches)) {
     final String contents = file.readAsStringSync().replaceAll('\r\n', '\n');
     if (contents.isEmpty)
       continue; // let's not go down the /bin/true rabbit hole
@@ -270,12 +272,13 @@ const Set<String> _exemptTestImports = <String>{
   'package:flutter_test/flutter_test.dart',
   'hit_test.dart',
   'package:test_api/src/backend/live_test.dart',
+  'package:integration_test/integration_test.dart',
 };
 
 Future<void> verifyNoTestImports(String workingDirectory) async {
   final List<String> errors = <String>[];
   assert("// foo\nimport 'binding_test.dart' as binding;\n'".contains(_testImportPattern));
-  final List<File> dartFiles = _allFiles(path.join(workingDirectory, 'packages'), 'dart', minimumMatches: 1500).toList();
+  final List<File> dartFiles = await _allFiles(path.join(workingDirectory, 'packages'), 'dart', minimumMatches: 1500).toList();
   for (final File file in dartFiles) {
     for (final String line in file.readAsLinesSync()) {
       final Match match = _testImportPattern.firstMatch(line);
@@ -289,79 +292,6 @@ Future<void> verifyNoTestImports(String workingDirectory) async {
     exitWithError(<String>[
       '${bold}The following file$s import a test directly. Test utilities should be in their own file.$reset',
       ...errors,
-    ]);
-  }
-}
-
-Future<void> verifyNoTestPackageImports(String workingDirectory) async {
-  // TODO(ianh): Remove this whole test once https://github.com/dart-lang/matcher/issues/98 is fixed.
-  final List<String> shims = <String>[];
-  final List<String> errors = _allFiles(workingDirectory, 'dart', minimumMatches: 2000)
-    .map<String>((File file) {
-      final String name = Uri.file(path.relative(file.path,
-          from: workingDirectory)).toFilePath(windows: false);
-      if (name.startsWith('bin/cache') ||
-          name == 'dev/bots/test.dart' ||
-          name.startsWith('.pub-cache'))
-        return null;
-      final String data = file.readAsStringSync();
-      if (data.contains("import 'package:test/test.dart'")) {
-        if (data.contains("// Defines a 'package:test' shim.")) {
-          shims.add('  $name');
-          if (!data.contains('https://github.com/dart-lang/matcher/issues/98'))
-            return '  $name: Shims must link to the isInstanceOf issue.';
-          if (data.contains("import 'package:test/test.dart' hide TypeMatcher, isInstanceOf;") &&
-              data.contains("export 'package:test/test.dart' hide TypeMatcher, isInstanceOf;"))
-            return null;
-          return '  $name: Shim seems to be missing the expected import/export lines.';
-        }
-        final int count = 'package:test'.allMatches(data).length;
-        if (path.split(file.path).contains('test_driver') ||
-            name.startsWith('dev/missing_dependency_tests/') ||
-            name.startsWith('dev/automated_tests/') ||
-            name.startsWith('dev/snippets/') ||
-            name.startsWith('packages/flutter/test/engine/') ||
-            name.startsWith('examples/layers/test/smoketests/raw/') ||
-            name.startsWith('examples/layers/test/smoketests/rendering/') ||
-            name.startsWith('dev/integration_tests/flutter_gallery/test/calculator')) {
-          // We only exempt driver tests, some of our special trivial tests.
-          // Driver tests aren't typically expected to use TypeMatcher and company.
-          // The trivial tests don't typically do anything at all and it would be
-          // a pain to have to give them a shim.
-          if (!data.contains("import 'package:test/test.dart' hide TypeMatcher, isInstanceOf;"))
-            return '  $name: test does not hide TypeMatcher and isInstanceOf from package:test; consider using a shim instead.';
-          assert(count > 0);
-          if (count == 1)
-            return null;
-          return "  $name: uses 'package:test' $count times.";
-        }
-        if (name.startsWith('packages/flutter_test/')) {
-          // flutter_test has deep ties to package:test
-          return null;
-        }
-        if (data.contains("import 'package:test/test.dart' as test_package;") ||
-            data.contains("import 'package:test/test.dart' as test_package show ")) {
-          if (count == 1)
-            return null;
-        }
-        return "  $name: uses 'package:test' directly";
-      }
-      return null;
-    })
-    .where((String line) => line != null)
-    .toList()
-    ..sort();
-
-  // Fail if any errors
-  if (errors.isNotEmpty) {
-    final String s1 = errors.length == 1 ? 's' : '';
-    final String s2 = errors.length == 1 ? '' : 's';
-    exitWithError(<String>[
-      "${bold}The following file$s2 use$s1 'package:test' incorrectly:$reset",
-      ...errors,
-      "Rather than depending on 'package:test' directly, use one of the shims:",
-      ...shims,
-      "This insulates us from breaking changes in 'package:test'."
     ]);
   }
 }
@@ -391,7 +321,7 @@ Future<void> verifyNoBadImportsInFlutter(String workingDirectory) async {
   // Verify that the imports are well-ordered.
   final Map<String, Set<String>> dependencyMap = <String, Set<String>>{};
   for (final String directory in directories) {
-    dependencyMap[directory] = _findFlutterDependencies(path.join(srcPath, directory), errors, checkForMeta: directory != 'foundation');
+    dependencyMap[directory] = await _findFlutterDependencies(path.join(srcPath, directory), errors, checkForMeta: directory != 'foundation');
   }
   assert(dependencyMap['material'].contains('widgets') &&
          dependencyMap['widgets'].contains('rendering') &&
@@ -442,7 +372,7 @@ Future<void> verifyNoBadImportsInFlutter(String workingDirectory) async {
 
 Future<void> verifyNoBadImportsInFlutterTools(String workingDirectory) async {
   final List<String> errors = <String>[];
-  final List<File> files = _allFiles(path.join(workingDirectory, 'packages', 'flutter_tools', 'lib'), 'dart', minimumMatches: 200).toList();
+  final List<File> files = await _allFiles(path.join(workingDirectory, 'packages', 'flutter_tools', 'lib'), 'dart', minimumMatches: 200).toList();
   for (final File file in files) {
     if (file.readAsStringSync().contains('package:flutter_tools/')) {
       errors.add('$yellow${file.path}$reset imports flutter_tools.');
@@ -514,7 +444,7 @@ Future<void> verifyNoRuntimeTypeInToString(String workingDirectory) async {
   final Set<String> excludedFiles = <String>{
     path.join(flutterLib, 'src', 'foundation', 'object.dart'), // Calls this from within an assert.
   };
-  final List<File> files = _allFiles(flutterLib, 'dart', minimumMatches: 400)
+  final List<File> files = await _allFiles(flutterLib, 'dart', minimumMatches: 400)
       .where((File file) => !excludedFiles.contains(file.path))
       .toList();
   final RegExp toStringRegExp = RegExp(r'^\s+String\s+to(.+?)?String(.+?)?\(\)\s+(\{|=>)');
@@ -562,7 +492,7 @@ Future<void> verifyNoRuntimeTypeInToString(String workingDirectory) async {
 }
 
 Future<void> verifyNoTrailingSpaces(String workingDirectory, { int minimumMatches = 4000 }) async {
-  final List<File> files = _allFiles(workingDirectory, null, minimumMatches: minimumMatches)
+  final List<File> files = await _allFiles(workingDirectory, null, minimumMatches: minimumMatches)
     .where((File file) => path.basename(file.path) != 'serviceaccount.enc')
     .where((File file) => path.basename(file.path) != 'Ahem.ttf')
     .where((File file) => path.extension(file.path) != '.snapshot')
@@ -1024,27 +954,7 @@ Future<void> verifyNoBinaries(String workingDirectory, { Set<Hash256> legacyBina
   );
   legacyBinaries ??= _legacyBinaries;
   if (!Platform.isWindows) { // TODO(ianh): Port this to Windows
-    final EvalResult evalResult = await _evalCommand(
-      'git', <String>['ls-files', '-z'],
-      workingDirectory: workingDirectory,
-    );
-    if (evalResult.exitCode != 0) {
-      exitWithError(<String>[
-        'git ls-filese failed with exit code ${evalResult.exitCode}',
-        '${bold}stdout:$reset',
-        evalResult.stdout,
-        '${bold}stderr:$reset',
-        evalResult.stderr,
-      ]);
-    }
-    final List<String> filenames = evalResult
-      .stdout
-      .split('\x00');
-    assert(filenames.last.isEmpty); // git ls-files gives a trailing blank 0x00
-    filenames.removeLast();
-    final List<File> files = filenames
-      .map<File>((String filename) => File(path.join(workingDirectory, filename)))
-      .toList();
+    final List<File> files = await _gitFiles(workingDirectory, runSilently: false);
     final List<String> problems = <String>[];
     for (final File file in files) {
       final Uint8List bytes = file.readAsBytesSync();
@@ -1084,7 +994,35 @@ bool _listEquals<T>(List<T> a, List<T> b) {
   return true;
 }
 
-Iterable<File> _allFiles(String workingDirectory, String extension, { @required int minimumMatches }) sync* {
+Future<List<File>> _gitFiles(String workingDirectory, {bool runSilently = true}) async {
+  final EvalResult evalResult = await _evalCommand(
+    'git', <String>['ls-files', '-z'],
+    workingDirectory: workingDirectory,
+    runSilently: runSilently,
+  );
+  if (evalResult.exitCode != 0) {
+    exitWithError(<String>[
+      'git ls-filese failed with exit code ${evalResult.exitCode}',
+      '${bold}stdout:$reset',
+      evalResult.stdout,
+      '${bold}stderr:$reset',
+      evalResult.stderr,
+    ]);
+  }
+  final List<String> filenames = evalResult
+      .stdout
+      .split('\x00');
+  assert(filenames.last.isEmpty); // git ls-files gives a trailing blank 0x00
+  filenames.removeLast();
+  return filenames
+      .map<File>((String filename) => File(path.join(workingDirectory, filename)))
+      .toList();
+}
+
+Stream<File> _allFiles(String workingDirectory, String extension, { @required int minimumMatches }) async* {
+  final Set<String> gitFileNamesSet = <String>{};
+  gitFileNamesSet.addAll((await _gitFiles(workingDirectory)).map((File f) => path.canonicalize(f.absolute.path)));
+
   assert(extension == null || !extension.startsWith('.'), 'Extension argument should not start with a period.');
   final Set<FileSystemEntity> pending = <FileSystemEntity>{ Directory(workingDirectory) };
   int matches = 0;
@@ -1094,6 +1032,8 @@ Iterable<File> _allFiles(String workingDirectory, String extension, { @required 
     if (path.extension(entity.path) == '.tmpl')
       continue;
     if (entity is File) {
+      if (!gitFileNamesSet.contains(path.canonicalize(entity.absolute.path)))
+        continue;
       if (_isGeneratedPluginRegistrant(entity))
         continue;
       if (path.basename(entity.path) == 'flutter_export_environment.sh')
@@ -1145,6 +1085,7 @@ Future<EvalResult> _evalCommand(String executable, List<String> arguments, {
   Map<String, String> environment,
   bool skip = false,
   bool allowNonZeroExit = false,
+  bool runSilently = false,
 }) async {
   final String commandDescription = '${path.relative(executable, from: workingDirectory)} ${arguments.join(' ')}';
   final String relativeWorkingDir = path.relative(workingDirectory);
@@ -1152,7 +1093,10 @@ Future<EvalResult> _evalCommand(String executable, List<String> arguments, {
     printProgress('SKIPPING', relativeWorkingDir, commandDescription);
     return null;
   }
-  printProgress('RUNNING', relativeWorkingDir, commandDescription);
+
+  if (!runSilently) {
+    printProgress('RUNNING', relativeWorkingDir, commandDescription);
+  }
 
   final Stopwatch time = Stopwatch()..start();
   final Process process = await Process.start(executable, arguments,
@@ -1169,7 +1113,9 @@ Future<EvalResult> _evalCommand(String executable, List<String> arguments, {
     exitCode: exitCode,
   );
 
-  print('$clock ELAPSED TIME: $bold${prettyPrintDuration(time.elapsed)}$reset for $commandDescription in $relativeWorkingDir');
+  if (!runSilently) {
+    print('$clock ELAPSED TIME: $bold${prettyPrintDuration(time.elapsed)}$reset for $commandDescription in $relativeWorkingDir');
+  }
 
   if (exitCode != 0 && !allowNonZeroExit) {
     stderr.write(result.stderr);
@@ -1186,7 +1132,7 @@ Future<EvalResult> _evalCommand(String executable, List<String> arguments, {
 Future<void> _runFlutterAnalyze(String workingDirectory, {
   List<String> options = const <String>[],
 }) async {
-  return await runCommand(
+  return runCommand(
     flutter,
     <String>['analyze', '--dartdocs', ...options],
     workingDirectory: workingDirectory,
@@ -1196,7 +1142,7 @@ Future<void> _runFlutterAnalyze(String workingDirectory, {
 final RegExp _importPattern = RegExp(r'''^\s*import (['"])package:flutter/([^.]+)\.dart\1''');
 final RegExp _importMetaPattern = RegExp(r'''^\s*import (['"])package:meta/meta\.dart\1''');
 
-Set<String> _findFlutterDependencies(String srcPath, List<String> errors, { bool checkForMeta = false }) {
+Future<Set<String>> _findFlutterDependencies(String srcPath, List<String> errors, { bool checkForMeta = false }) async {
   return _allFiles(srcPath, 'dart', minimumMatches: 1)
     .map<Set<String>>((File file) {
       final Set<String> result = <String>{};

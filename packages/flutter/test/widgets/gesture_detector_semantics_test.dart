@@ -117,7 +117,7 @@ void main() {
 
     final Set<String> logs = <String>{};
     final GlobalKey<RawGestureDetectorState> detectorKey = GlobalKey();
-    final VoidCallback performLayout = () {
+    void performLayout() {
       detectorKey.currentState!.replaceGestureRecognizers(<Type, GestureRecognizerFactory>{
         TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
           () => TapGestureRecognizer(),
@@ -126,7 +126,7 @@ void main() {
           },
         ),
       });
-    };
+    }
 
     bool hasLayoutPerformer = false;
     late VoidCallback introduceLayoutPerformer;
@@ -714,6 +714,11 @@ class _RenderTestLayoutPerformer extends RenderBox {
   _RenderTestLayoutPerformer({required VoidCallback performLayout}) : _performLayout = performLayout;
 
   final VoidCallback _performLayout;
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    return const Size(1, 1);
+  }
 
   @override
   void performLayout() {

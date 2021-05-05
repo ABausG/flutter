@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-@TestOn('!chrome')
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui show Image, ColorFilter;
@@ -10,8 +9,8 @@ import 'dart:ui' as ui show Image, ColorFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter_test/flutter_test.dart';
 
-import '../flutter_test_alternative.dart';
 import '../image_data.dart';
 import '../painting/mocks_for_image_cache.dart';
 import '../rendering/rendering_tester.dart';
@@ -352,12 +351,12 @@ void main() {
       '   When DecorationImagePainter.paint() was called, there was no text\n'
       '   direction provided in the ImageConfiguration object to match.\n'
       '   The DecorationImage was:\n'
-      '     DecorationImage(SynchronousTestImageProvider(), center, match\n'
-      '     text direction, scale: 1.0)\n'
+      '     DecorationImage(SynchronousTestImageProvider(),\n'
+      '     Alignment.center, match text direction, scale: 1.0)\n'
       '   The ImageConfiguration was:\n'
       '     ImageConfiguration(size: Size(100.0, 100.0))\n'
     );
-  });
+  }, skip: kIsWeb);
 
   test('DecorationImage - error listener', () async {
     late String exception;
@@ -702,5 +701,5 @@ void main() {
     expect(info.image.debugGetOpenHandleStackTraces()!.length, baselineRefCount);
 
     info.dispose();
-  });
+  }, skip: kIsWeb);
 }

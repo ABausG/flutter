@@ -235,7 +235,7 @@ class RenderListWheelViewport
     markNeedsLayout();
   }
 
-  /// {@template flutter.rendering.wheelList.diameterRatio}
+  /// {@template flutter.rendering.RenderListWheelViewport.diameterRatio}
   /// A ratio between the diameter of the cylinder and the viewport's size
   /// in the main axis.
   ///
@@ -278,7 +278,7 @@ class RenderListWheelViewport
     markNeedsSemanticsUpdate();
   }
 
-  /// {@template flutter.rendering.wheelList.perspective}
+  /// {@template flutter.rendering.RenderListWheelViewport.perspective}
   /// Perspective of the cylindrical projection.
   ///
   /// A number between 0 and 0.01 where 0 means looking at the cylinder from
@@ -308,7 +308,7 @@ class RenderListWheelViewport
     markNeedsSemanticsUpdate();
   }
 
-  /// {@template flutter.rendering.wheelList.offAxisFraction}
+  /// {@template flutter.rendering.RenderListWheelViewport.offAxisFraction}
   /// How much the wheel is horizontally off-center, as a fraction of its width.
 
   /// This property creates the visual effect of looking at a vertical wheel from
@@ -343,7 +343,7 @@ class RenderListWheelViewport
     markNeedsPaint();
   }
 
-  /// {@template flutter.rendering.wheelList.useMagnifier}
+  /// {@template flutter.rendering.RenderListWheelViewport.useMagnifier}
   /// Whether to use the magnifier for the center item of the wheel.
   /// {@endtemplate}
   bool get useMagnifier => _useMagnifier;
@@ -355,7 +355,7 @@ class RenderListWheelViewport
     _useMagnifier = value;
     markNeedsPaint();
   }
-  /// {@template flutter.rendering.wheelList.magnification}
+  /// {@template flutter.rendering.RenderListWheelViewport.magnification}
   /// The zoomed-in rate of the magnifier, if it is used.
   ///
   /// The default value is 1.0, which will not change anything.
@@ -376,7 +376,7 @@ class RenderListWheelViewport
     markNeedsPaint();
   }
 
-  /// {@template flutter.rendering.wheelList.overAndUnderCenterOpacity}
+  /// {@template flutter.rendering.RenderListWheelViewport.overAndUnderCenterOpacity}
   /// The opacity value that will be applied to the wheel that appears below and
   /// above the magnifier.
   ///
@@ -395,7 +395,7 @@ class RenderListWheelViewport
     markNeedsPaint();
   }
 
-  /// {@template flutter.rendering.wheelList.itemExtent}
+  /// {@template flutter.rendering.RenderListWheelViewport.itemExtent}
   /// The size of the children along the main axis. Children [RenderBox]es will
   /// be given the [BoxConstraints] of this exact size.
   ///
@@ -413,7 +413,7 @@ class RenderListWheelViewport
   }
 
 
-  /// {@template flutter.rendering.wheelList.squeeze}
+  /// {@template flutter.rendering.RenderListWheelViewport.squeeze}
   /// The angular compactness of the children on the wheel.
   ///
   /// This denotes a ratio of the number of children on the wheel vs the number
@@ -445,7 +445,7 @@ class RenderListWheelViewport
     markNeedsSemanticsUpdate();
   }
 
-  /// {@template flutter.rendering.wheelList.renderChildrenOutsideViewport}
+  /// {@template flutter.rendering.RenderListWheelViewport.renderChildrenOutsideViewport}
   /// Whether to paint children inside the viewport only.
   ///
   /// If false, every child will be painted. However the [Scrollable] is still
@@ -470,7 +470,7 @@ class RenderListWheelViewport
     markNeedsSemanticsUpdate();
   }
 
-  /// {@macro flutter.widgets.Clip}
+  /// {@macro flutter.material.Material.clipBehavior}
   ///
   /// Defaults to [Clip.hardEdge], and must not be null.
   Clip get clipBehavior => _clipBehavior;
@@ -580,14 +580,14 @@ class RenderListWheelViewport
   @override
   double computeMinIntrinsicWidth(double height) {
     return _getIntrinsicCrossAxis(
-      (RenderBox child) => child.getMinIntrinsicWidth(height)
+      (RenderBox child) => child.getMinIntrinsicWidth(height),
     );
   }
 
   @override
   double computeMaxIntrinsicWidth(double height) {
     return _getIntrinsicCrossAxis(
-      (RenderBox child) => child.getMaxIntrinsicWidth(height)
+      (RenderBox child) => child.getMaxIntrinsicWidth(height),
     );
   }
 
@@ -609,8 +609,8 @@ class RenderListWheelViewport
   bool get sizedByParent => true;
 
   @override
-  void performResize() {
-    size = constraints.biggest;
+  Size computeDryLayout(BoxConstraints constraints) {
+    return constraints.biggest;
   }
 
   /// Gets the index of a child by looking at its [parentData].
@@ -880,20 +880,23 @@ class RenderListWheelViewport
     // Some part of the child is in the center magnifier.
     if (isAfterMagnifierTopLine && isBeforeMagnifierBottomLine) {
       final Rect centerRect = Rect.fromLTWH(
-          0.0,
-          magnifierTopLinePosition,
-          size.width,
-          _itemExtent * _magnification);
+        0.0,
+        magnifierTopLinePosition,
+        size.width,
+        _itemExtent * _magnification,
+      );
       final Rect topHalfRect = Rect.fromLTWH(
-          0.0,
-          0.0,
-          size.width,
-          magnifierTopLinePosition);
+        0.0,
+        0.0,
+        size.width,
+        magnifierTopLinePosition,
+      );
       final Rect bottomHalfRect = Rect.fromLTWH(
-          0.0,
-          magnifierBottomLinePosition,
-          size.width,
-          magnifierTopLinePosition);
+        0.0,
+        magnifierBottomLinePosition,
+        size.width,
+        magnifierTopLinePosition,
+      );
 
       // Clipping the part in the center.
       context.pushClipRect(
@@ -907,8 +910,10 @@ class RenderListWheelViewport
             _magnifyTransform(),
             (PaintingContext context, Offset offset) {
               context.paintChild(child, offset + untransformedPaintingCoordinates);
-          });
-      });
+            },
+          );
+        },
+      );
 
       // Clipping the part in either the top-half or bottom-half of the wheel.
       context.pushClipRect(
@@ -923,7 +928,8 @@ class RenderListWheelViewport
             offset,
             child,
             cylindricalTransform,
-            offsetToCenter);
+            offsetToCenter,
+          );
         },
       );
     } else {
@@ -932,7 +938,8 @@ class RenderListWheelViewport
         offset,
         child,
         cylindricalTransform,
-        offsetToCenter);
+        offsetToCenter,
+      );
     }
   }
 
@@ -945,18 +952,18 @@ class RenderListWheelViewport
     Offset offsetToCenter,
   ) {
     // Paint child cylindrically, without [overAndUnderCenterOpacity].
-    final PaintingContextCallback painter = (PaintingContext context, Offset offset) {
+    void painter(PaintingContext context, Offset offset) {
       context.paintChild(
         child,
         // Paint everything in the center (e.g. angle = 0), then transform.
         offset + offsetToCenter,
       );
-    };
+    }
 
     // Paint child cylindrically, with [overAndUnderCenterOpacity].
-    final PaintingContextCallback opacityPainter = (PaintingContext context, Offset offset) {
+    void opacityPainter(PaintingContext context, Offset offset) {
       context.pushOpacity(offset, (overAndUnderCenterOpacity * 255).round(), painter);
-    };
+    }
 
     context.pushTransform(
       needsCompositing,
@@ -982,11 +989,15 @@ class RenderListWheelViewport
   Matrix4 _centerOriginTransform(Matrix4 originalMatrix) {
     final Matrix4 result = Matrix4.identity();
     final Offset centerOriginTranslation = Alignment.center.alongSize(size);
-    result.translate(centerOriginTranslation.dx * (-_offAxisFraction * 2 + 1),
-                     centerOriginTranslation.dy);
+    result.translate(
+      centerOriginTranslation.dx * (-_offAxisFraction * 2 + 1),
+      centerOriginTranslation.dy,
+    );
     result.multiply(originalMatrix);
-    result.translate(-centerOriginTranslation.dx * (-_offAxisFraction * 2 + 1),
-                     -centerOriginTranslation.dy);
+    result.translate(
+      -centerOriginTranslation.dx * (-_offAxisFraction * 2 + 1),
+      -centerOriginTranslation.dy,
+    );
     return result;
   }
 

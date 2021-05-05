@@ -12,6 +12,8 @@ import 'actions.dart';
 import 'banner.dart';
 import 'basic.dart';
 import 'binding.dart';
+import 'default_text_editing_actions.dart';
+import 'default_text_editing_shortcuts.dart';
 import 'focus_traversal.dart';
 import 'framework.dart';
 import 'localizations.dart';
@@ -49,7 +51,7 @@ export 'dart:ui' show Locale;
 ///    is recommended over [LocaleResolutionCallback].
 typedef LocaleListResolutionCallback = Locale? Function(List<Locale>? locales, Iterable<Locale> supportedLocales);
 
-/// {@template flutter.widgets.widgetsApp.localeResolutionCallback}
+/// {@template flutter.widgets.LocaleResolutionCallback}
 /// The signature of [WidgetsApp.localeResolutionCallback].
 ///
 /// It is recommended to provide a [LocaleListResolutionCallback] instead of a
@@ -203,13 +205,13 @@ class WidgetsApp extends StatefulWidget {
          home == null ||
          onGenerateInitialRoutes == null,
          'If onGenerateInitialRoutes is specified, the home argument will be '
-         'redundant.'
+         'redundant.',
        ),
        assert(
          home == null ||
          !routes.containsKey(Navigator.defaultRouteName),
          'If the home property is specified, the routes table '
-         'cannot include an entry for "/", since it would be redundant.'
+         'cannot include an entry for "/", since it would be redundant.',
        ),
        assert(
          builder != null ||
@@ -223,7 +225,7 @@ class WidgetsApp extends StatefulWidget {
          'or there must be an onUnknownRoute callback specified, '
          'or the builder property must be specified, '
          'because otherwise there is nothing to fall back on if the '
-         'app is started with an intent that specifies an unknown route.'
+         'app is started with an intent that specifies an unknown route.',
        ),
        assert(
          (home != null ||
@@ -241,7 +243,7 @@ class WidgetsApp extends StatefulWidget {
          'and the other navigator-related properties, '
          'navigatorKey, initialRoute, and navigatorObservers, '
          'must have their initial values '
-         '(null, null, and the empty list, respectively).'
+         '(null, null, and the empty list, respectively).',
        ),
        assert(
          builder != null ||
@@ -249,7 +251,7 @@ class WidgetsApp extends StatefulWidget {
          pageRouteBuilder != null,
          'If neither builder nor onGenerateRoute are provided, the '
          'pageRouteBuilder must be specified so that the default handler '
-         'will know what kind of PageRoute transition to build.'
+         'will know what kind of PageRoute transition to build.',
        ),
        assert(title != null),
        assert(color != null),
@@ -296,7 +298,7 @@ class WidgetsApp extends StatefulWidget {
   }) : assert(
          routeInformationParser != null &&
          routerDelegate != null,
-         'The routeInformationParser and routerDelegate cannot be null.'
+         'The routeInformationParser and routerDelegate cannot be null.',
        ),
        assert(title != null),
        assert(color != null),
@@ -433,8 +435,8 @@ class WidgetsApp extends StatefulWidget {
   /// This object will be used by the underlying [Router].
   ///
   /// If this is not provided, the widgets app will create a
-  /// [PlatformRouteInformationProvider] with initial route name equals to
-  /// the [Window.defaultRouteName] by default.
+  /// [PlatformRouteInformationProvider] with initial route name equal to the
+  /// [dart:ui.PlatformDispatcher.defaultRouteName] by default.
   ///
   /// See also:
   ///
@@ -525,8 +527,8 @@ class WidgetsApp extends StatefulWidget {
   /// {@template flutter.widgets.widgetsApp.initialRoute}
   /// The name of the first route to show, if a [Navigator] is built.
   ///
-  /// Defaults to [Window.defaultRouteName], which may be overridden by the code
-  /// that launched the application.
+  /// Defaults to [dart:ui.PlatformDispatcher.defaultRouteName], which may be
+  /// overridden by the code that launched the application.
   ///
   /// If the route name starts with a slash, then it is treated as a "deep link",
   /// and before this route is pushed, the routes leading to this one are pushed
@@ -861,6 +863,9 @@ class WidgetsApp extends StatefulWidget {
   /// The default map of keyboard shortcuts to intents for the application.
   ///
   /// By default, this is set to [WidgetsApp.defaultShortcuts].
+  ///
+  /// Passing this will not replace [DefaultTextEditingShortcuts]. These can be
+  /// overridden by using a [Shortcuts] widget lower in the widget tree.
   /// {@endtemplate}
   ///
   /// {@tool snippet}
@@ -880,7 +885,7 @@ class WidgetsApp extends StatefulWidget {
   ///       LogicalKeySet(LogicalKeyboardKey.select): const ActivateIntent(),
   ///     },
   ///     color: const Color(0xFFFF0000),
-  ///     builder: (BuildContext context, Widget child) {
+  ///     builder: (BuildContext context, Widget? child) {
   ///       return const Placeholder();
   ///     },
   ///   );
@@ -910,6 +915,9 @@ class WidgetsApp extends StatefulWidget {
   /// the [actions] for this app. You may also add to the bindings, or override
   /// specific bindings for a widget subtree, by adding your own [Actions]
   /// widget.
+  ///
+  /// Passing this will not replace [DefaultTextEditingActions]. These can be
+  /// overridden by placing an [Actions] widget lower in the widget tree.
   /// {@endtemplate}
   ///
   /// {@tool snippet}
@@ -926,7 +934,7 @@ class WidgetsApp extends StatefulWidget {
   ///   return WidgetsApp(
   ///     actions: <Type, Action<Intent>>{
   ///       ... WidgetsApp.defaultActions,
-  ///       ActivateAction: CallbackAction(
+  ///       ActivateAction: CallbackAction<Intent>(
   ///         onInvoke: (Intent intent) {
   ///           // Do something here...
   ///           return null;
@@ -934,7 +942,7 @@ class WidgetsApp extends StatefulWidget {
   ///       ),
   ///     },
   ///     color: const Color(0xFFFF0000),
-  ///     builder: (BuildContext context, Widget child) {
+  ///     builder: (BuildContext context, Widget? child) {
   ///       return const Placeholder();
   ///     },
   ///   );
@@ -1024,7 +1032,14 @@ class WidgetsApp extends StatefulWidget {
   // Default shortcuts for the web platform.
   static final Map<LogicalKeySet, Intent> _defaultWebShortcuts = <LogicalKeySet, Intent>{
     // Activation
-    LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
+    LogicalKeySet(LogicalKeyboardKey.space): const PrioritizedIntents(
+      orderedIntents: <Intent>[
+        ActivateIntent(),
+        ScrollIntent(direction: AxisDirection.down, type: ScrollIncrementType.page),
+      ],
+    ),
+    // On the web, enter activates buttons, but not other controls.
+    LogicalKeySet(LogicalKeyboardKey.enter): const ButtonActivateIntent(),
 
     // Dismissal
     LogicalKeySet(LogicalKeyboardKey.escape): const DismissIntent(),
@@ -1043,7 +1058,7 @@ class WidgetsApp extends StatefulWidget {
   };
 
   // Default shortcuts for the macOS platform.
-  static final Map<LogicalKeySet, Intent> _defaultMacOsShortcuts = <LogicalKeySet, Intent>{
+  static final Map<LogicalKeySet, Intent> _defaultAppleOsShortcuts = <LogicalKeySet, Intent>{
     // Activation
     LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
     LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
@@ -1083,23 +1098,22 @@ class WidgetsApp extends StatefulWidget {
       case TargetPlatform.linux:
       case TargetPlatform.windows:
         return _defaultShortcuts;
-      case TargetPlatform.macOS:
-        return _defaultMacOsShortcuts;
       case TargetPlatform.iOS:
-        // No keyboard support on iOS yet.
-        break;
+      case TargetPlatform.macOS:
+        return _defaultAppleOsShortcuts;
     }
-    return <LogicalKeySet, Intent>{};
   }
 
   /// The default value of [WidgetsApp.actions].
   static Map<Type, Action<Intent>> defaultActions = <Type, Action<Intent>>{
     DoNothingIntent: DoNothingAction(),
+    DoNothingAndStopPropagationIntent: DoNothingAction(consumesKey: false),
     RequestFocusIntent: RequestFocusAction(),
     NextFocusIntent: NextFocusAction(),
     PreviousFocusIntent: PreviousFocusAction(),
     DirectionalFocusIntent: DirectionalFocusAction(),
     ScrollIntent: ScrollAction(),
+    PrioritizedIntents: PrioritizedAction(),
   };
 
   @override
@@ -1191,15 +1205,16 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
         : widget.routes![name];
 
     if (pageContentBuilder != null) {
-      assert(widget.pageRouteBuilder != null,
+      assert(
+        widget.pageRouteBuilder != null,
         'The default onGenerateRoute handler for WidgetsApp must have a '
-        'pageRouteBuilder set if the home or routes properties are set.');
+        'pageRouteBuilder set if the home or routes properties are set.',
+      );
       final Route<dynamic> route = widget.pageRouteBuilder!<dynamic>(
         settings,
         pageContentBuilder,
       );
-      assert(route != null,
-        'The pageRouteBuilder for WidgetsApp must return a valid non-null Route.');
+      assert(route != null, 'The pageRouteBuilder for WidgetsApp must return a valid non-null Route.');
       return route;
     }
     if (widget.onGenerateRoute != null)
@@ -1221,7 +1236,7 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
           ' 3. Otherwise, onGenerateRoute is called. It should return a '
           'non-null value for any valid route not handled by "home" and "routes".\n'
           ' 4. Finally if all else fails onUnknownRoute is called.\n'
-          'Unfortunately, onUnknownRoute was not set.'
+          'Unfortunately, onUnknownRoute was not set.',
         );
       }
       return true;
@@ -1233,7 +1248,7 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
           'The onUnknownRoute callback returned null.\n'
           'When the $runtimeType requested the route $settings from its '
           'onUnknownRoute callback, the callback returned null. Such callbacks '
-          'must never return null.'
+          'must never return null.',
         );
       }
       return true;
@@ -1253,7 +1268,7 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
     final NavigatorState? navigator = _navigator?.currentState;
     if (navigator == null)
       return false;
-    return await navigator.maybePop();
+    return navigator.maybePop();
   }
 
   @override
@@ -1470,7 +1485,7 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
       message.writeln('\u2550' * 8);
       message.writeln(
         "Warning: This application's locale, $appLocale, is not supported by all of its\n"
-        'localization delegates.'
+        'localization delegates.',
       );
       for (final Type unsupportedType in unsupportedTypes) {
         // Currently the Cupertino library only provides english localizations.
@@ -1479,13 +1494,13 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
         if (unsupportedType.toString() == 'CupertinoLocalizations')
           continue;
         message.writeln(
-          '> A $unsupportedType delegate that supports the $appLocale locale was not found.'
+          '> A $unsupportedType delegate that supports the $appLocale locale was not found.',
         );
       }
       message.writeln(
         'See https://flutter.dev/tutorials/internationalization/ for more\n'
         "information about configuring an app's locale, supportedLocales,\n"
-        'and localizationsDelegates parameters.'
+        'and localizationsDelegates parameters.',
       );
       message.writeln('\u2550' * 8);
       debugPrint(message.toString());
@@ -1615,20 +1630,27 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
       : _locale!;
 
     assert(_debugCheckLocalizations(appLocale));
+
     return RootRestorationScope(
       restorationId: widget.restorationScopeId,
       child: Shortcuts(
-        shortcuts: widget.shortcuts ?? WidgetsApp.defaultShortcuts,
         debugLabel: '<Default WidgetsApp Shortcuts>',
-        child: Actions(
-          actions: widget.actions ?? WidgetsApp.defaultActions,
-          child: FocusTraversalGroup(
-            policy: ReadingOrderTraversalPolicy(),
-            child: _MediaQueryFromWindow(
-              child: Localizations(
-                locale: appLocale,
-                delegates: _localizationsDelegates.toList(),
-                child: title,
+        shortcuts: widget.shortcuts ?? WidgetsApp.defaultShortcuts,
+        // DefaultTextEditingShortcuts is nested inside Shortcuts so that it can
+        // fall through to the defaultShortcuts.
+        child: DefaultTextEditingShortcuts(
+          child: Actions(
+            actions: widget.actions ?? WidgetsApp.defaultActions,
+            child: DefaultTextEditingActions(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: _MediaQueryFromWindow(
+                  child: Localizations(
+                    locale: appLocale,
+                    delegates: _localizationsDelegates.toList(),
+                    child: title,
+                  ),
+                ),
               ),
             ),
           ),

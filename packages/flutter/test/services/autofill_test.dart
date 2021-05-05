@@ -31,7 +31,7 @@ void main() {
         const AutofillConfiguration config = AutofillConfiguration(
           uniqueIdentifier: 'id',
           autofillHints: <String>[],
-          currentEditingValue: TextEditingValue(),
+          currentEditingValue: TextEditingValue.empty,
         );
 
         json = config.toJson();
@@ -43,8 +43,7 @@ void main() {
     });
 
     test(
-      'AutofillClients send the correct configuration to the platform'
-      'and responds to updateEditingStateWithTag method correctly',
+      'AutofillClients send the correct configuration to the platform and responds to updateEditingStateWithTag method correctly',
       () async {
         final FakeAutofillClient client1 = FakeAutofillClient(const TextEditingValue(text: 'test1'));
         final FakeAutofillClient client2 = FakeAutofillClient(const TextEditingValue(text: 'test2'));
@@ -195,7 +194,7 @@ class FakeTextChannel implements MethodChannel {
   bool checkMethodCallHandler(Future<void> Function(MethodCall call)? handler) => throw UnimplementedError();
 
   @override
-  void setMockMethodCallHandler(Future<void> Function(MethodCall call)? handler)  => throw UnimplementedError();
+  void setMockMethodCallHandler(Future<void>? Function(MethodCall call)? handler)  => throw UnimplementedError();
 
   @override
   bool checkMockMethodCallHandler(Future<void> Function(MethodCall call)? handler) => throw UnimplementedError();

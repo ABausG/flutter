@@ -51,7 +51,7 @@ class DecorationImage {
     this.centerSlice,
     this.repeat = ImageRepeat.noRepeat,
     this.matchTextDirection = false,
-    this.scale = 1.0
+    this.scale = 1.0,
   }) : assert(image != null),
        assert(alignment != null),
        assert(repeat != null),
@@ -188,7 +188,7 @@ class DecorationImage {
         '$repeat',
       if (matchTextDirection)
         'match text direction',
-      'scale: $scale'
+      'scale: $scale',
     ];
     return '${objectRuntimeType(this, 'DecorationImage')}(${properties.join(", ")})';
   }
@@ -243,7 +243,7 @@ class DecorationImagePainter {
             ErrorSummary('DecorationImage.matchTextDirection can only be used when a TextDirection is available.'),
             ErrorDescription(
               'When DecorationImagePainter.paint() was called, there was no text direction provided '
-              'in the ImageConfiguration object to match.'
+              'in the ImageConfiguration object to match.',
             ),
             DiagnosticsProperty<DecorationImage>('The DecorationImage was', _details, style: DiagnosticsTreeStyle.errorProperty),
             DiagnosticsProperty<ImageConfiguration>('The ImageConfiguration was', configuration, style: DiagnosticsTreeStyle.errorProperty),
@@ -440,7 +440,7 @@ void paintImage({
     image.debugGetOpenHandleStackTraces()?.isNotEmpty ?? true,
     'Cannot paint an image that is disposed.\n'
     'The caller of paintImage is expected to wait to dispose the image until '
-    'after painting has completed.'
+    'after painting has completed.',
   );
   if (rect.isEmpty)
     return;
@@ -448,12 +448,9 @@ void paintImage({
   Size inputSize = Size(image.width.toDouble(), image.height.toDouble());
   Offset? sliceBorder;
   if (centerSlice != null) {
-    sliceBorder = Offset(
-      centerSlice.left + inputSize.width - centerSlice.right,
-      centerSlice.top + inputSize.height - centerSlice.bottom,
-    );
+    sliceBorder = inputSize / scale - centerSlice.size as Offset;
     outputSize = outputSize - sliceBorder as Size;
-    inputSize = inputSize - sliceBorder as Size;
+    inputSize = inputSize - sliceBorder * scale as Size;
   }
   fit ??= centerSlice == null ? BoxFit.scaleDown : BoxFit.fill;
   assert(centerSlice == null || (fit != BoxFit.none && fit != BoxFit.cover));
@@ -476,9 +473,7 @@ void paintImage({
   final Paint paint = Paint()..isAntiAlias = isAntiAlias;
   if (colorFilter != null)
     paint.colorFilter = colorFilter;
-  if (sourceSize != destinationSize) {
-    paint.filterQuality = filterQuality;
-  }
+  paint.filterQuality = filterQuality;
   paint.invertColors = invertColors;
   final double halfWidthDelta = (outputSize.width - destinationSize.width) / 2.0;
   final double halfHeightDelta = (outputSize.height - destinationSize.height) / 2.0;
@@ -507,7 +502,7 @@ void paintImage({
           exception: 'Image $debugImageLabel has a display size of '
             '$outputWidth×$outputHeight but a decode size of '
             '${image.width}×${image.height}, which uses an additional '
-            '${overheadInKilobytes}kb.\n\n'
+            '${overheadInKilobytes}KB.\n\n'
             'Consider resizing the asset ahead of time, supplying a cacheWidth '
             'parameter of $outputWidth, a cacheHeight parameter of '
             '$outputHeight, or using a ResizeImage.',
@@ -539,9 +534,7 @@ void paintImage({
       if (existingSizeInfo == null || existingSizeInfo.displaySizeInBytes < sizeInfo.displaySizeInBytes) {
         _pendingImageSizeInfo[sizeInfo.source!] = sizeInfo;
       }
-      if (debugOnPaintImage != null) {
-        debugOnPaintImage!(sizeInfo);
-      }
+      debugOnPaintImage?.call(sizeInfo);
       SchedulerBinding.instance!.addPostFrameCallback((Duration timeStamp) {
         _lastFrameImageSizeInfo = _pendingImageSizeInfo.values.toSet();
         if (_pendingImageSizeInfo.isEmpty) {
@@ -551,7 +544,7 @@ void paintImage({
           'Flutter.ImageSizesForFrame',
           <String, Object>{
             for (ImageSizeInfo imageSizeInfo in _pendingImageSizeInfo.values)
-              imageSizeInfo.source!: imageSizeInfo.toJson()
+              imageSizeInfo.source!: imageSizeInfo.toJson(),
           },
         );
         _pendingImageSizeInfo = <String, ImageSizeInfo>{};
@@ -559,7 +552,7 @@ void paintImage({
     }
   }
 
-  final bool needSave = repeat != ImageRepeat.noRepeat || flipHorizontally;
+  final bool needSave = centerSlice != null || repeat != ImageRepeat.noRepeat || flipHorizontally;
   if (needSave)
     canvas.save();
   if (repeat != ImageRepeat.noRepeat)
@@ -581,11 +574,12 @@ void paintImage({
         canvas.drawImageRect(image, sourceRect, tileRect, paint);
     }
   } else {
+    canvas.scale(1 / scale);
     if (repeat == ImageRepeat.noRepeat) {
-      canvas.drawImageNine(image, centerSlice, destinationRect, paint);
+      canvas.drawImageNine(image, _scaleRect(centerSlice, scale), _scaleRect(destinationRect, scale), paint);
     } else {
       for (final Rect tileRect in _generateImageTileRects(rect, destinationRect, repeat))
-        canvas.drawImageNine(image, centerSlice, tileRect, paint);
+        canvas.drawImageNine(image, _scaleRect(centerSlice, scale), _scaleRect(tileRect, scale), paint);
     }
   }
   if (needSave)
@@ -619,3 +613,5 @@ Iterable<Rect> _generateImageTileRects(Rect outputRect, Rect fundamentalRect, Im
       yield fundamentalRect.shift(Offset(i * strideX, j * strideY));
   }
 }
+
+Rect _scaleRect(Rect rect, double scale) => Rect.fromLTRB(rect.left * scale, rect.top * scale, rect.right * scale, rect.bottom * scale);

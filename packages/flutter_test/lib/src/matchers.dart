@@ -7,10 +7,9 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:ui';
 
+// This import is discouraged in general, but we need it to implement flutter_test.
 // ignore: deprecated_member_use
-import 'package:test_api/test_api.dart' hide TypeMatcher, isInstanceOf;
-// ignore: deprecated_member_use
-import 'package:test_api/test_api.dart' as test_package show TypeMatcher;
+import 'package:test_api/test_api.dart';
 import 'package:test_api/src/frontend/async_matcher.dart'; // ignore: implementation_imports
 
 import 'package:flutter/foundation.dart';
@@ -196,7 +195,7 @@ final Matcher throwsAssertionError = throwsA(isAssertionError);
 ///
 ///  * [throwsFlutterError], to test if a function throws a [FlutterError].
 ///  * [isAssertionError], to test if any object is any kind of [AssertionError].
-final test_package.TypeMatcher<FlutterError> isFlutterError = isA<FlutterError>();
+final TypeMatcher<FlutterError> isFlutterError = isA<FlutterError>();
 
 /// A matcher for [AssertionError].
 ///
@@ -206,15 +205,16 @@ final test_package.TypeMatcher<FlutterError> isFlutterError = isA<FlutterError>(
 ///
 ///  * [throwsAssertionError], to test if a function throws any [AssertionError].
 ///  * [isFlutterError], to test if any object is a [FlutterError].
-final test_package.TypeMatcher<AssertionError> isAssertionError = isA<AssertionError>();
+final TypeMatcher<AssertionError> isAssertionError = isA<AssertionError>();
 
 /// A matcher that compares the type of the actual value to the type argument T.
-// TODO(ianh): Remove this once https://github.com/dart-lang/matcher/issues/98 is fixed
-test_package.TypeMatcher<T> isInstanceOf<T>() => isA<T>();
+///
+/// This is identical to [isA] and is included for backwards compatibility.
+TypeMatcher<T> isInstanceOf<T>() => isA<T>();
 
 /// Asserts that two [double]s are equal, within some tolerated error.
 ///
-/// {@template flutter.flutter_test.moreOrLessEquals.epsilon}
+/// {@template flutter.flutter_test.moreOrLessEquals}
 /// Two values are considered equal if the difference between them is within
 /// [precisionErrorTolerance] of the larger one. This is an arbitrary value
 /// which can be adjusted using the `epsilon` argument. This matcher is intended
@@ -237,7 +237,7 @@ Matcher moreOrLessEquals(double value, { double epsilon = precisionErrorToleranc
 
 /// Asserts that two [Rect]s are equal, within some tolerated error.
 ///
-/// {@macro flutter.flutter_test.moreOrLessEquals.epsilon}
+/// {@macro flutter.flutter_test.moreOrLessEquals}
 ///
 /// See also:
 ///
@@ -251,7 +251,7 @@ Matcher rectMoreOrLessEquals(Rect value, { double epsilon = precisionErrorTolera
 
 /// Asserts that two [Offset]s are equal, within some tolerated error.
 ///
-/// {@macro flutter.flutter_test.moreOrLessEquals.epsilon}
+/// {@macro flutter.flutter_test.moreOrLessEquals}
 ///
 /// See also:
 ///
@@ -449,6 +449,8 @@ Matcher matchesSemantics({
   bool isChecked = false,
   bool isSelected = false,
   bool isButton = false,
+  bool isSlider = false,
+  bool isKeyboardKey = false,
   bool isLink = false,
   bool isFocused = false,
   bool isFocusable = false,
@@ -482,6 +484,7 @@ Matcher matchesSemantics({
   bool hasMoveCursorBackwardByCharacterAction = false,
   bool hasMoveCursorForwardByWordAction = false,
   bool hasMoveCursorBackwardByWordAction = false,
+  bool hasSetTextAction = false,
   bool hasSetSelectionAction = false,
   bool hasCopyAction = false,
   bool hasCutAction = false,
@@ -500,6 +503,8 @@ Matcher matchesSemantics({
     if (isChecked) SemanticsFlag.isChecked,
     if (isSelected) SemanticsFlag.isSelected,
     if (isButton) SemanticsFlag.isButton,
+    if (isSlider) SemanticsFlag.isSlider,
+    if (isKeyboardKey) SemanticsFlag.isKeyboardKey,
     if (isLink) SemanticsFlag.isLink,
     if (isTextField) SemanticsFlag.isTextField,
     if (isReadOnly) SemanticsFlag.isReadOnly,
@@ -519,6 +524,7 @@ Matcher matchesSemantics({
     if (hasToggledState) SemanticsFlag.hasToggledState,
     if (isToggled) SemanticsFlag.isToggled,
     if (hasImplicitScrolling) SemanticsFlag.hasImplicitScrolling,
+    if (isSlider) SemanticsFlag.isSlider
   ];
 
   final List<SemanticsAction> actions = <SemanticsAction>[
@@ -543,6 +549,7 @@ Matcher matchesSemantics({
     if (hasDismissAction) SemanticsAction.dismiss,
     if (hasMoveCursorForwardByWordAction) SemanticsAction.moveCursorForwardByWord,
     if (hasMoveCursorBackwardByWordAction) SemanticsAction.moveCursorBackwardByWord,
+    if (hasSetTextAction) SemanticsAction.setText,
   ];
   SemanticsHintOverrides? hintOverrides;
   if (onTapHint != null || onLongPressHint != null)
@@ -682,7 +689,7 @@ class _FindsWidgetMatcher extends Matcher {
   }
 }
 
-bool _hasAncestorMatching(Finder finder, bool predicate(Widget widget)) {
+bool _hasAncestorMatching(Finder finder, bool Function(Widget widget) predicate) {
   final Iterable<Element> nodes = finder.evaluate();
   if (nodes.length != 1)
     return false;

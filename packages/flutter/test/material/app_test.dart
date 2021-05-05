@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../rendering/mock_canvas.dart';
+
 class StateMarker extends StatefulWidget {
   const StateMarker({ Key? key, this.child }) : super(key: key);
 
@@ -100,7 +102,7 @@ void main() {
             return Material(
               child: ElevatedButton(
                 child: const Text('X'),
-                onPressed: () { Navigator.of(context)!.pushNamed('/next'); },
+                onPressed: () { Navigator.of(context).pushNamed('/next'); },
               ),
             );
           }
@@ -249,7 +251,7 @@ void main() {
   });
 
   testWidgets('Return value from pop is correct', (WidgetTester tester) async {
-    late Future<Object> result;
+    late Future<Object?> result;
     await tester.pumpWidget(
         MaterialApp(
           home: Builder(
@@ -258,7 +260,7 @@ void main() {
                   child: ElevatedButton(
                       child: const Text('X'),
                       onPressed: () async {
-                        result = Navigator.of(context)!.pushNamed('/a');
+                        result = Navigator.of(context).pushNamed<Object?>('/a');
                       },
                   ),
                 );
@@ -270,7 +272,7 @@ void main() {
                 child: ElevatedButton(
                   child: const Text('Y'),
                   onPressed: () {
-                    Navigator.of(context)!.pop('all done');
+                    Navigator.of(context).pop('all done');
                   },
                 ),
               );
@@ -464,7 +466,7 @@ void main() {
     double? textScaleFactor;
     await tester.pumpWidget(MaterialApp(
       home: Builder(builder:(BuildContext context) {
-        textScaleFactor = MediaQuery.of(context)!.textScaleFactor;
+        textScaleFactor = MediaQuery.of(context).textScaleFactor;
         return Container();
       }),
     ));
@@ -500,8 +502,8 @@ void main() {
           builder: (BuildContext context) {
             return Column(
               children: <Widget>[
-                Text(MaterialLocalizations.of(context)!.selectAllButtonLabel),
-                Text(CupertinoLocalizations.of(context)!.selectAllButtonLabel),
+                Text(MaterialLocalizations.of(context).selectAllButtonLabel),
+                Text(CupertinoLocalizations.of(context).selectAllButtonLabel),
               ],
             );
           },
@@ -531,7 +533,7 @@ void main() {
         themeMode: ThemeMode.light,
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -552,7 +554,7 @@ void main() {
         themeMode: ThemeMode.light,
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -577,7 +579,7 @@ void main() {
         themeMode: ThemeMode.dark,
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -598,7 +600,7 @@ void main() {
         themeMode: ThemeMode.dark,
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -625,7 +627,7 @@ void main() {
         themeMode: ThemeMode.system,
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -651,7 +653,7 @@ void main() {
         themeMode: ThemeMode.system,
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -674,7 +676,7 @@ void main() {
         ),
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -695,7 +697,7 @@ void main() {
       MaterialApp(
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -719,7 +721,7 @@ void main() {
         ),
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -746,7 +748,7 @@ void main() {
         ),
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -772,7 +774,7 @@ void main() {
         ),
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -805,7 +807,7 @@ void main() {
         ),
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -832,7 +834,7 @@ void main() {
         ),
         home: Builder(
           builder: (BuildContext context) {
-            appliedTheme = Theme.of(context)!;
+            appliedTheme = Theme.of(context);
             return const SizedBox();
           },
         ),
@@ -880,6 +882,37 @@ void main() {
 
     expect(themeBeforeBrightnessChange!.brightness, Brightness.light);
     expect(themeAfterBrightnessChange!.brightness, Brightness.dark);
+  });
+
+  testWidgets('MaterialApp provides default overscroll color', (WidgetTester tester) async {
+    Future<void> slowDrag(WidgetTester tester, Offset start, Offset offset) async {
+      final TestGesture gesture = await tester.startGesture(start);
+      for (int index = 0; index < 10; index += 1) {
+        await gesture.moveBy(offset);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      await gesture.up();
+    }
+
+    // The overscroll color should be a transparent version of the colorScheme's
+    // secondary color.
+    const Color secondaryColor = Color(0xff008800);
+    final Color glowSecondaryColor = secondaryColor.withOpacity(0.05);
+    final ThemeData theme = ThemeData.from(
+      colorScheme: const ColorScheme.light().copyWith(secondary: secondaryColor),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: const SingleChildScrollView(
+          child: SizedBox(height: 2000.0),
+        ),
+      ),
+    );
+
+    final RenderObject painter = tester.renderObject(find.byType(CustomPaint).first);
+    await slowDrag(tester, const Offset(200.0, 200.0), const Offset(0.0, 5.0));
+    expect(painter, paints..circle(color: glowSecondaryColor));
   });
 
   testWidgets('MaterialApp can customize initial routes', (WidgetTester tester) async {
@@ -993,6 +1026,46 @@ void main() {
     ));
     expect(builderChild, isNull);
   });
+
+  testWidgets('MaterialApp has correct default ScrollBehavior', (WidgetTester tester) async {
+    late BuildContext capturedContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (BuildContext context) {
+            capturedContext = context;
+            return const Placeholder();
+          },
+        ),
+      ),
+    );
+    expect(ScrollConfiguration.of(capturedContext).runtimeType, MaterialScrollBehavior);
+  });
+
+  testWidgets('A ScrollBehavior can be set for MaterialApp', (WidgetTester tester) async {
+    late BuildContext capturedContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        scrollBehavior: const MockScrollBehavior(),
+        home: Builder(
+          builder: (BuildContext context) {
+            capturedContext = context;
+            return const Placeholder();
+          },
+        ),
+      ),
+    );
+    final ScrollBehavior scrollBehavior = ScrollConfiguration.of(capturedContext);
+    expect(scrollBehavior.runtimeType, MockScrollBehavior);
+    expect(scrollBehavior.getScrollPhysics(capturedContext).runtimeType, NeverScrollableScrollPhysics);
+  });
+}
+
+class MockScrollBehavior extends ScrollBehavior {
+  const MockScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const NeverScrollableScrollPhysics();
 }
 
 class MockAccessibilityFeature implements AccessibilityFeatures {

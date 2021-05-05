@@ -6,7 +6,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/semantics.dart';
 import 'package:vector_math/vector_math_64.dart';
@@ -48,7 +47,7 @@ class OverScrollHeaderStretchConfiguration {
   final AsyncCallback? onStretchTrigger;
 }
 
-/// {@template flutter.rendering.persistentHeader.showOnScreenConfiguration}
+/// {@template flutter.rendering.PersistentHeaderShowOnScreenConfiguration}
 /// Specifies how a pinned header or a floating header should react to
 /// [RenderObject.showOnScreen] calls.
 /// {@endtemplate}
@@ -66,7 +65,7 @@ class PersistentHeaderShowOnScreenConfiguration {
   /// [RenderSliverPersistentHeader.minExtent].
   ///
   /// When a floating persistent header is told to show a [Rect] on screen, it
-  /// may expand itself to accomodate the [Rect]. The minimum extent that is
+  /// may expand itself to accommodate the [Rect]. The minimum extent that is
   /// allowed for such expansion is either
   /// [RenderSliverPersistentHeader.minExtent] or [minShowOnScreenExtent],
   /// whichever is larger. If the persistent header's current extent is already
@@ -86,7 +85,7 @@ class PersistentHeaderShowOnScreenConfiguration {
   /// [RenderSliverPersistentHeader.maxExtent].
   ///
   /// When a floating persistent header is told to show a [Rect] on screen, it
-  /// may expand itself to accomodate the [Rect]. The maximum extent that is
+  /// may expand itself to accommodate the [Rect]. The maximum extent that is
   /// allowed for such expansion is either
   /// [RenderSliverPersistentHeader.maxExtent] or [maxShowOnScreenExtent],
   /// whichever is smaller. If the persistent header's current extent is already
@@ -500,7 +499,7 @@ class FloatingHeaderSnapConfiguration {
   FloatingHeaderSnapConfiguration({
     @Deprecated(
       'Specify SliverPersistentHeaderDelegate.vsync instead. '
-      'This feature was deprecated after v1.19.0.'
+      'This feature was deprecated after v1.19.0.',
     )
     this.vsync,
     this.curve = Curves.ease,
@@ -512,7 +511,7 @@ class FloatingHeaderSnapConfiguration {
   /// header to snap in or out of view.
   @Deprecated(
     'Specify SliverPersistentHeaderDelegate.vsync instead. '
-    'This feature was deprecated after v1.19.0.'
+    'This feature was deprecated after v1.19.0.',
   )
   final TickerProvider? vsync;
 
@@ -593,7 +592,7 @@ abstract class RenderSliverFloatingPersistentHeader extends RenderSliverPersiste
   ///    and snapped into view via the corresponding parameters.
   FloatingHeaderSnapConfiguration? snapConfiguration;
 
-  /// {@macro flutter.rendering.persistentHeader.showOnScreenConfiguration}
+  /// {@macro flutter.rendering.PersistentHeaderShowOnScreenConfiguration}
   ///
   /// If set to null, the persistent header will delegate the `showOnScreen` call
   /// to it's parent [RenderObject].
@@ -755,7 +754,7 @@ abstract class RenderSliverFloatingPersistentHeader extends RenderSliverPersiste
         showOnScreen.maxShowOnScreenExtent,
       )
       // Clamp the value back to the valid range after applying additional
-      // constriants. Contracting is not allowed.
+      // constraints. Contracting is not allowed.
       .clamp(childExtent, effectiveMaxExtent);
 
     // Expands the header if needed, with animation.

@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'package:meta/meta.dart';
 
 import '../artifacts.dart';
 import '../base/common.dart';
 import '../base/logger.dart';
-import '../base/process.dart';
 import '../build_info.dart';
 import '../globals.dart' as globals;
 import '../project.dart';
@@ -71,11 +72,10 @@ class FuchsiaKernelCompiler {
     ];
     final Status status = globals.logger.startProgress(
       'Building Fuchsia application...',
-      timeout: null,
     );
     int result;
     try {
-      result = await processUtils.stream(command, trace: true);
+      result = await globals.processUtils.stream(command, trace: true);
     } finally {
       status.cancel();
     }
@@ -117,7 +117,6 @@ class FuchsiaKernelCompiler {
         '-Ddart.vm.profile=false',
         '-Ddart.vm.product=true',
       ],
-      '-Ddart.developer.causal_async_stacks=${buildInfo.isDebug}',
 
       for (final String dartDefine in buildInfo.dartDefines)
         '-D$dartDefine',

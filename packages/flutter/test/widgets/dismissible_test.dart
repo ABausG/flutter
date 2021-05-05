@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
-import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,7 +17,7 @@ const double crossAxisEndOffset = 0.5;
 Widget buildTest({
   double? startToEndThreshold,
   TextDirection textDirection = TextDirection.ltr,
-  Future<bool> Function(BuildContext context, DismissDirection direction)? confirmDismiss,
+  Future<bool?> Function(BuildContext context, DismissDirection direction)? confirmDismiss,
 }) {
   return Directionality(
     textDirection: textDirection,
@@ -47,7 +46,7 @@ Widget buildTest({
                 ? <DismissDirection, double>{}
                 : <DismissDirection, double>{DismissDirection.startToEnd: startToEndThreshold},
             crossAxisEndOffset: crossAxisEndOffset,
-            child: Container(
+            child: SizedBox(
               width: itemExtent,
               height: itemExtent,
               child: Text(item.toString()),
@@ -99,8 +98,6 @@ Future<void> dismissElement(WidgetTester tester, Finder finder, { required AxisD
       downLocation = tester.getTopLeft(finder) + const Offset(0.1, 0.0);
       upLocation = tester.getBottomLeft(finder);
       break;
-    default:
-      fail('unsupported gestureDirection');
   }
 
   final TestGesture gesture = await tester.startGesture(downLocation);
@@ -123,8 +120,6 @@ Future<void> flingElement(WidgetTester tester, Finder finder, { required AxisDir
     case AxisDirection.down:
       delta = const Offset(0.0, 300.0);
       break;
-    default:
-      fail('unsupported gestureDirection');
   }
   await tester.fling(finder, delta, 1000.0, initialOffset: delta * initialOffsetFactor);
 }
@@ -579,7 +574,7 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: Center(
-          child: Container(
+          child: SizedBox(
             width: 100.0,
             height: 1000.0,
             child: Column(
@@ -683,7 +678,7 @@ void main() {
       return buildTest(
         confirmDismiss: (BuildContext context, DismissDirection dismissDirection) {
           confirmDismissDirection = dismissDirection;
-          return Future<bool>.value(confirmDismissValue);
+          return Future<bool?>.value(confirmDismissValue);
         }
       );
     }
@@ -760,7 +755,7 @@ void main() {
                 background: background,
                 dismissThresholds: const <DismissDirection, double>{},
                 crossAxisEndOffset: crossAxisEndOffset,
-                child: Container(
+                child: SizedBox(
                   width: itemExtent,
                   height: itemExtent,
                   child: Text(1.toString()),
@@ -864,5 +859,18 @@ void main() {
     await pumpWidgetTree(HitTestBehavior.translucent);
     await tester.tapAt(const Offset(10.0, 10.0));
     expect(didReceivePointerDown, isTrue);
+  });
+
+  testWidgets('DismissDirection.none does not trigger dismiss', (WidgetTester tester) async {
+    dismissDirection = DismissDirection.none;
+
+    await tester.pumpWidget(buildTest());
+    expect(dismissedItems, isEmpty);
+
+    await dismissItem(tester, 0, gestureDirection: AxisDirection.left);
+    await dismissItem(tester, 0, gestureDirection: AxisDirection.right);
+    await dismissItem(tester, 0, gestureDirection: AxisDirection.up);
+    await dismissItem(tester, 0, gestureDirection: AxisDirection.down);
+    expect(find.text('0'), findsOneWidget);
   });
 }

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'dart:convert';
 
 import 'package:flutter_tools/src/base/file_system.dart';
@@ -132,23 +134,6 @@ void main() {
     expect(result.stderr, contains('Target file')); // Target file not found, but different paths on Windows and Linux/macOS.
   });
 
-  testWithoutContext('flutter build aot is deprecated', () async {
-    final String flutterBin = fileSystem.path.join(getFlutterRoot(), 'bin', 'flutter');
-    final ProcessResult result = await processManager.run(<String>[
-      flutterBin,
-      ...getLocalEngineArguments(),
-      'build',
-      '-h',
-      '-v',
-    ]);
-
-    // Deprecated.
-    expect(result.stdout, isNot(contains('aot')));
-
-    // Only printed by verbose tool.
-    expect(result.stdout, isNot(contains('exiting with code 0')));
-  });
-
   testWithoutContext('flutter --version --machine outputs JSON with flutterRoot', () async {
     final String flutterBin = fileSystem.path.join(getFlutterRoot(), 'bin', 'flutter');
     final ProcessResult result = await processManager.run(<String>[
@@ -220,5 +205,38 @@ void main() {
 
     expect(result.exitCode, 1);
     expect(result.stderr, contains('No SkSL shader bundle found at foo/bar/baz.json'));
+  });
+
+  testWithoutContext('flutter attach does not support --release', () async {
+    final String flutterBin = fileSystem.path.join(getFlutterRoot(), 'bin', 'flutter');
+    final String helloWorld = fileSystem.path.join(getFlutterRoot(), 'examples', 'hello_world');
+    final ProcessResult result = await processManager.run(<String>[
+      flutterBin,
+      ...getLocalEngineArguments(),
+      '--show-test-device',
+      'attach',
+      '--release',
+    ], workingDirectory: helloWorld);
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr, contains('Could not find an option named "release"'));
+  });
+
+  testWithoutContext('flutter can report crashes', () async {
+    final String flutterBin = fileSystem.path.join(getFlutterRoot(), 'bin', 'flutter');
+    final ProcessResult result = await processManager.run(<String>[
+      flutterBin,
+      ...getLocalEngineArguments(),
+      'update-packages',
+      '--crash',
+    ], environment: <String, String>{
+      'BOT': 'false',
+    });
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr, contains(
+      'Oops; flutter has exited unexpectedly: "Bad state: test crash please ignore.".\n'
+      'A crash report has been written to',
+    ));
   });
 }

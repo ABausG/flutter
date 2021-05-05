@@ -51,7 +51,7 @@ bool debugInstrumentationEnabled = false;
 ///  * [Timeline], which is used to record synchronous tracing events for
 ///    visualization in Chrome's tracing format. This method does not
 ///    implicitly add any timeline events.
-Future<T> debugInstrumentAction<T>(String description, Future<T> action()) async {
+Future<T> debugInstrumentAction<T>(String description, Future<T> Function() action) async {
   bool instrument = false;
   assert(() {
     instrument = debugInstrumentationEnabled;
@@ -102,10 +102,17 @@ String debugFormatDouble(double? value) {
 }
 
 /// A setting that can be used to override the platform [Brightness] exposed
-/// from [BindingBase.window].
+/// from [BindingBase.platformDispatcher].
 ///
 /// See also:
 ///
 ///  * [WidgetsApp], which uses the [debugBrightnessOverride] setting in debug mode
 ///    to construct a [MediaQueryData].
 ui.Brightness? debugBrightnessOverride;
+
+/// The address for the active DevTools server used for debugging this
+/// application.
+String? activeDevToolsServerAddress;
+
+/// The uri for the connected vm service protocol.
+String? connectedVmServiceUri;

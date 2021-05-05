@@ -38,7 +38,7 @@ void main() {
 
     expect(tester.testTextInput.isVisible, isFalse);
 
-    Navigator.of(tester.element(find.text('Dialog')))!.pop();
+    Navigator.of(tester.element(find.text('Dialog'))).pop();
     await tester.pump();
 
     expect(focusNode.hasPrimaryFocus, isTrue);
@@ -119,6 +119,8 @@ void main() {
     expect(tester.testTextInput.isVisible, isTrue);
 
     tester.testTextInput.hide();
+    final EditableTextState state = tester.state<EditableTextState>(find.byType(EditableText));
+    state.connectionClosed();
 
     expect(tester.testTextInput.isVisible, isFalse);
 

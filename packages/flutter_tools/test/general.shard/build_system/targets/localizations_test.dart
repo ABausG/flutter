@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/build_system/build_system.dart';
 import 'package:flutter_tools/src/build_system/targets/localizations.dart';
 import 'package:flutter_tools/src/localizations/gen_l10n.dart';
+import 'package:flutter_tools/src/localizations/localizations_utils.dart';
 import 'package:mockito/mockito.dart';
 
 import '../../../src/common.dart';
@@ -16,7 +19,7 @@ import '../../../src/context.dart';
 void main() {
   // Verifies that values are correctly passed through the localizations
   // target, but does not validate them beyond the serialized data type.
-  testUsingContext('generateLocalizations forwards arguments correctly', () async {
+  testWithoutContext('generateLocalizations forwards arguments correctly', () async {
     final FileSystem fileSystem = MemoryFileSystem.test();
     final Logger logger = BufferLogger.test();
     final Directory flutterProjectDirectory = fileSystem
@@ -35,10 +38,13 @@ void main() {
       deferredLoading: true,
       outputClass: 'Foo',
       outputLocalizationsFile: Uri.file('bar'),
+      outputDirectory: Uri.directory(fileSystem.path.join('lib', 'l10n')),
       preferredSupportedLocales: <String>['en_US'],
       templateArbFile: Uri.file('example.arb'),
       untranslatedMessagesFile: Uri.file('untranslated'),
       useSyntheticPackage: false,
+      areResourceAttributesRequired: true,
+      usesNullableGetter: false,
     );
 
     final LocalizationsGenerator mockLocalizationsGenerator = MockLocalizationsGenerator();
@@ -49,29 +55,30 @@ void main() {
       projectDir: fileSystem.currentDirectory,
       dependenciesDir: fileSystem.currentDirectory,
     );
-
     verify(
       mockLocalizationsGenerator.initialize(
-      inputPathString: 'arb',
-      outputPathString: null,
-      templateArbFileName: 'example.arb',
-      outputFileString: 'bar',
-      classNameString: 'Foo',
-      preferredSupportedLocale: <String>['en_US'],
-      headerString: 'HEADER',
-      headerFile: 'header',
-      useDeferredLoading: true,
-      inputsAndOutputsListPath: '/',
-      useSyntheticPackage: false,
-      projectPathString: '/',
+        inputPathString: 'arb',
+        outputPathString: fileSystem.path.join('lib', 'l10n/'),
+        templateArbFileName: 'example.arb',
+        outputFileString: 'bar',
+        classNameString: 'Foo',
+        preferredSupportedLocales: <String>['en_US'],
+        headerString: 'HEADER',
+        headerFile: 'header',
+        useDeferredLoading: true,
+        inputsAndOutputsListPath: '/',
+        useSyntheticPackage: false,
+        projectPathString: '/',
+        areResourceAttributesRequired: true,
+        untranslatedMessagesFile: 'untranslated',
+        usesNullableGetter: false,
       ),
     ).called(1);
     verify(mockLocalizationsGenerator.loadResources()).called(1);
-    verify(mockLocalizationsGenerator.writeOutputFiles()).called(1);
-    verify(mockLocalizationsGenerator.outputUnimplementedMessages('untranslated', logger)).called(1);
+    verify(mockLocalizationsGenerator.writeOutputFiles(logger, isFromYaml: true)).called(1);
   });
 
-  testUsingContext('generateLocalizations throws exception on missing flutter: generate: true flag', () async {
+  testWithoutContext('generateLocalizations throws exception on missing flutter: generate: true flag', () async {
     final FileSystem fileSystem = MemoryFileSystem.test();
     final BufferLogger logger = BufferLogger.test();
     final Directory arbDirectory = fileSystem.directory('arb')
@@ -146,6 +153,9 @@ header-file: header
 header: HEADER
 use-deferred-loading: true
 preferred-supported-locales: en_US
+synthetic-package: false
+required-resource-attributes: false
+nullable-getter: false
 ''');
 
     final LocalizationOptions options = parseLocalizationsOptions(
@@ -162,6 +172,9 @@ preferred-supported-locales: en_US
     expect(options.header, 'HEADER');
     expect(options.deferredLoading, true);
     expect(options.preferredSupportedLocales, <String>['en_US']);
+    expect(options.useSyntheticPackage, false);
+    expect(options.areResourceAttributesRequired, false);
+    expect(options.usesNullableGetter, false);
   });
 
   testWithoutContext('parseLocalizationsOptions handles preferredSupportedLocales as list', () async {

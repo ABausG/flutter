@@ -5,8 +5,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart' show kMinFlingVelocity, kLongPressTimeout;
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -88,7 +86,7 @@ enum _ContextMenuLocation {
 /// Widget build(BuildContext context) {
 ///   return Scaffold(
 ///     body: Center(
-///       child: Container(
+///       child: SizedBox(
 ///         width: 100,
 ///         height: 100,
 ///         child: CupertinoContextMenu(
@@ -253,7 +251,7 @@ class _CupertinoContextMenuState extends State<CupertinoContextMenu> with Ticker
   // it.
   _ContextMenuLocation get _contextMenuLocation {
     final Rect childRect = _getRect(_childGlobalKey);
-    final double screenWidth = MediaQuery.of(context)!.size.width;
+    final double screenWidth = MediaQuery.of(context).size.width;
 
     final double center = screenWidth / 2;
     final bool centerDividesChild = childRect.left < center
@@ -292,7 +290,7 @@ class _CupertinoContextMenuState extends State<CupertinoContextMenu> with Ticker
         return widget.previewBuilder!(context, animation, widget.child);
       },
     );
-    Navigator.of(context, rootNavigator: true)!.push<void>(_route!);
+    Navigator.of(context, rootNavigator: true).push<void>(_route!);
     _route!.animation!.addStatusListener(_routeAnimationStatusListener);
   }
 
@@ -512,22 +510,17 @@ class _DecoyChildState extends State<_DecoyChild> with TickerProviderStateMixin 
       : _mask.value;
     return Positioned.fromRect(
       rect: _rect.value!,
-      // TODO(justinmc): When ShaderMask is supported on web, remove this
-      // conditional and use ShaderMask everywhere.
-      // https://github.com/flutter/flutter/issues/52967.
-      child: kIsWeb
-          ? Container(key: _childGlobalKey, child: widget.child)
-          : ShaderMask(
-            key: _childGlobalKey,
-            shaderCallback: (Rect bounds) {
-              return LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[color, color],
-              ).createShader(bounds);
-            },
-            child: widget.child,
-          ),
+      child: ShaderMask(
+        key: _childGlobalKey,
+        shaderCallback: (Rect bounds) {
+          return LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[color, color],
+          ).createShader(bounds);
+        },
+        child: widget.child,
+      ),
     );
   }
 
@@ -652,7 +645,7 @@ class _ContextMenuRoute<T> extends PopupRoute<T> {
         return AlignmentDirectional.topCenter;
       case _ContextMenuLocation.right:
         return AlignmentDirectional.topEnd;
-      default:
+      case _ContextMenuLocation.left:
         return AlignmentDirectional.topStart;
     }
   }
@@ -671,7 +664,7 @@ class _ContextMenuRoute<T> extends PopupRoute<T> {
           ? childRect.bottomRight
           : childRect.topRight;
         return (target - Offset(sheetRect.width, 0.0)) & sheetRect.size;
-      default:
+      case _ContextMenuLocation.left:
         final Offset target = orientation == Orientation.portrait
           ? childRect.bottomLeft
           : childRect.topLeft;
@@ -686,7 +679,7 @@ class _ContextMenuRoute<T> extends PopupRoute<T> {
       parent: animation!,
       curve: const Interval(0.9, 1.0),
     ));
-    Navigator.of(context)!.pop();
+    Navigator.of(context).pop();
   }
 
   // Take measurements on the child and _ContextMenuSheet and update the
@@ -731,7 +724,7 @@ class _ContextMenuRoute<T> extends PopupRoute<T> {
   }
 
   @override
-  bool didPop(T result) {
+  bool didPop(T? result) {
     _updateTweenRects();
     return super.didPop(result);
   }
@@ -978,7 +971,7 @@ class _ContextMenuRouteStaticState extends State<_ContextMenuRouteStatic> with T
         return orientation == Orientation.portrait
           ? Alignment.bottomCenter
           : Alignment.topLeft;
-      default:
+      case _ContextMenuLocation.left:
         return orientation == Orientation.portrait
           ? Alignment.bottomCenter
           : Alignment.topRight;
@@ -1060,7 +1053,7 @@ class _ContextMenuRouteStaticState extends State<_ContextMenuRouteStatic> with T
         return orientation == Orientation.portrait
           ? <Widget>[child, spacer, sheet]
           : <Widget>[sheet, spacer, child];
-      default:
+      case _ContextMenuLocation.left:
         return <Widget>[child, spacer, sheet];
     }
   }
@@ -1081,7 +1074,7 @@ class _ContextMenuRouteStaticState extends State<_ContextMenuRouteStatic> with T
   Widget _buildChildAnimation(BuildContext context, Widget? child) {
     _lastScale = _getScale(
       widget.orientation,
-      MediaQuery.of(context)!.size.height,
+      MediaQuery.of(context).size.height,
       _moveAnimation.value.dy,
     );
     return Transform.scale(
@@ -1233,7 +1226,7 @@ class _ContextMenuSheet extends StatelessWidget {
           ),
           menu,
         ];
-      default:
+      case _ContextMenuLocation.left:
         return <Widget>[
           menu,
           const Spacer(

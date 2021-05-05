@@ -45,13 +45,17 @@ import 'ticker_provider.dart';
 /// if widgets in an overlay entry with [maintainState] set to true repeatedly
 /// call [State.setState], the user's battery will be drained unnecessarily.
 ///
+/// [OverlayEntry] is a [ChangeNotifier] that notifies when the widget built by
+/// [builder] is mounted or unmounted, whose exact state can be queried by
+/// [mounted].
+///
 /// See also:
 ///
 ///  * [Overlay]
 ///  * [OverlayState]
 ///  * [WidgetsApp]
 ///  * [MaterialApp]
-class OverlayEntry {
+class OverlayEntry extends ChangeNotifier {
   /// Creates an overlay entry.
   ///
   /// To insert the entry into an [Overlay], first find the overlay using
@@ -111,6 +115,19 @@ class OverlayEntry {
     _maintainState = value;
     assert(_overlay != null);
     _overlay!._didChangeEntryOpacity();
+  }
+
+  /// Whether the [OverlayEntry] is currently mounted in the widget tree.
+  ///
+  /// The [OverlayEntry] notifies its listeners when this value changes.
+  bool get mounted => _mounted;
+  bool _mounted = false;
+  void _updateMounted(bool value) {
+    if (value == _mounted) {
+      return;
+    }
+    _mounted = value;
+    notifyListeners();
   }
 
   OverlayState? _overlay;
@@ -173,6 +190,18 @@ class _OverlayEntryWidget extends StatefulWidget {
 
 class _OverlayEntryWidgetState extends State<_OverlayEntryWidget> {
   @override
+  void initState() {
+    super.initState();
+    widget.entry._updateMounted(true);
+  }
+
+  @override
+  void dispose() {
+    widget.entry._updateMounted(false);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TickerMode(
       enabled: widget.tickerEnabled,
@@ -233,7 +262,7 @@ class Overlay extends StatefulWidget {
   /// To remove an entry from an [Overlay], use [OverlayEntry.remove].
   final List<OverlayEntry> initialEntries;
 
-  /// {@macro flutter.widgets.Clip}
+  /// {@macro flutter.material.Material.clipBehavior}
   ///
   /// Defaults to [Clip.hardEdge], and must not be null.
   final Clip clipBehavior;
@@ -271,7 +300,7 @@ class Overlay extends StatefulWidget {
           ErrorHint('The most common way to add an Overlay to an application is to include a MaterialApp or Navigator widget in the runApp() call.'),
           DiagnosticsProperty<Widget>('The specific widget that failed to find an overlay was', debugRequiredFor, style: DiagnosticsTreeStyle.errorProperty),
           if (context.widget != debugRequiredFor)
-            context.describeElement('The context from which that widget was searching for an overlay was')
+            context.describeElement('The context from which that widget was searching for an overlay was'),
         ];
 
         throw FlutterError.fromParts(information);
@@ -335,11 +364,11 @@ class OverlayState extends State<Overlay> with TickerProviderStateMixin {
     assert(_debugVerifyInsertPosition(above, below));
     assert(
       entries.every((OverlayEntry entry) => !_entries.contains(entry)),
-      'One or more of the specified entries are already present in the Overlay.'
+      'One or more of the specified entries are already present in the Overlay.',
     );
     assert(
       entries.every((OverlayEntry entry) => entry._overlay == null),
-      'One or more of the specified entries are already present in another Overlay.'
+      'One or more of the specified entries are already present in another Overlay.',
     );
     if (entries.isEmpty)
       return;
@@ -390,11 +419,11 @@ class OverlayState extends State<Overlay> with TickerProviderStateMixin {
     assert(_debugVerifyInsertPosition(above, below, newEntries: newEntriesList));
     assert(
       newEntriesList.every((OverlayEntry entry) => entry._overlay == null || entry._overlay == this),
-      'One or more of the specified entries are already present in another Overlay.'
+      'One or more of the specified entries are already present in another Overlay.',
     );
     assert(
       newEntriesList.every((OverlayEntry entry) => _entries.indexOf(entry) == _entries.lastIndexOf(entry)),
-      'One or more of the specified entries are specified multiple times.'
+      'One or more of the specified entries are specified multiple times.',
     );
     if (newEntriesList.isEmpty)
       return;
@@ -518,7 +547,7 @@ class _Theatre extends MultiChildRenderObjectWidget {
   _RenderTheatre createRenderObject(BuildContext context) {
     return _RenderTheatre(
       skipCount: skipCount,
-      textDirection: Directionality.of(context)!,
+      textDirection: Directionality.of(context),
       clipBehavior: clipBehavior,
     );
   }
@@ -527,7 +556,7 @@ class _Theatre extends MultiChildRenderObjectWidget {
   void updateRenderObject(BuildContext context, _RenderTheatre renderObject) {
     renderObject
       ..skipCount = skipCount
-      ..textDirection = Directionality.of(context)!
+      ..textDirection = Directionality.of(context)
       ..clipBehavior = clipBehavior;
   }
 
@@ -610,7 +639,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     }
   }
 
-  /// {@macro flutter.widgets.Clip}
+  /// {@macro flutter.material.Material.clipBehavior}
   ///
   /// Defaults to [Clip.hardEdge], and must not be null.
   Clip get clipBehavior => _clipBehavior;
@@ -687,9 +716,9 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
   bool get sizedByParent => true;
 
   @override
-  void performResize() {
-    size = constraints.biggest;
-    assert(size.isFinite);
+  Size computeDryLayout(BoxConstraints constraints) {
+    assert(constraints.biggest.isFinite);
+    return constraints.biggest;
   }
 
   @override
@@ -756,8 +785,14 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
   @override
   void paint(PaintingContext context, Offset offset) {
     if (_hasVisualOverflow && clipBehavior != Clip.none) {
-      _clipRectLayer = context.pushClipRect(needsCompositing, offset, Offset.zero & size, paintStack,
-          clipBehavior: clipBehavior, oldLayer: _clipRectLayer);
+      _clipRectLayer = context.pushClipRect(
+        needsCompositing,
+        offset,
+        Offset.zero & size,
+        paintStack,
+        clipBehavior: clipBehavior,
+        oldLayer: _clipRectLayer,
+      );
     } else {
       _clipRectLayer = null;
       paintStack(context, offset);

@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gallery/demo/shrine/colors.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -123,15 +125,15 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 class PrimaryColorOverride extends StatelessWidget {
-  const PrimaryColorOverride({Key key, this.color, this.child}) : super(key: key);
+  const PrimaryColorOverride({Key? key, this.color, this.child}) : super(key: key);
 
-  final Color color;
-  final Widget child;
+  final Color? color;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
     return Theme(
-      child: child,
+      child: child!,
       data: Theme.of(context).copyWith(primaryColor: color),
     );
   }

@@ -225,7 +225,7 @@ class RenderFlow extends RenderBox
     }
   }
 
-  /// {@macro flutter.widgets.Clip}
+  /// {@macro flutter.material.Material.clipBehavior}
   ///
   /// Defaults to [Clip.hardEdge], and must not be null.
   Clip get clipBehavior => _clipBehavior;
@@ -296,6 +296,11 @@ class RenderFlow extends RenderBox
   }
 
   @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    return _getSize(constraints);
+  }
+
+  @override
   void performLayout() {
     final BoxConstraints constraints = this.constraints;
     size = _getSize(constraints);
@@ -340,7 +345,7 @@ class RenderFlow extends RenderBox
         throw FlutterError(
           'Cannot call paintChild twice for the same child.\n'
           'The flow delegate of type ${_delegate.runtimeType} attempted to '
-          'paint child $i multiple times, which is not permitted.'
+          'paint child $i multiple times, which is not permitted.',
         );
       }
       return true;
@@ -387,8 +392,14 @@ class RenderFlow extends RenderBox
       _clipRectLayer = null;
       _paintWithDelegate(context, offset);
     } else {
-      _clipRectLayer = context.pushClipRect(needsCompositing, offset, Offset.zero & size, _paintWithDelegate,
-          clipBehavior: clipBehavior, oldLayer: _clipRectLayer);
+      _clipRectLayer = context.pushClipRect(
+        needsCompositing,
+        offset,
+        Offset.zero & size,
+        _paintWithDelegate,
+        clipBehavior: clipBehavior,
+        oldLayer: _clipRectLayer,
+      );
     }
   }
 

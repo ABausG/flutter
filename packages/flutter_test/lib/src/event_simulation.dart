@@ -4,6 +4,7 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'test_async_utils.dart';
 
@@ -11,6 +12,13 @@ import 'test_async_utils.dart';
 // the new key event code is in.
 // https://github.com/flutter/flutter/issues/33521
 // This code can only simulate keys which appear in the key maps.
+
+String _keyLabel(LogicalKeyboardKey key) {
+  final String keyLabel = key.keyLabel;
+  if (keyLabel.length == 1)
+    return keyLabel.toLowerCase();
+  return '';
+}
 
 /// A class that serves as a namespace for a bunch of keyboard-key generation
 /// utilities.
@@ -39,6 +47,7 @@ class KeyEventSimulator {
       case 'macos':
       case 'linux':
       case 'web':
+      case 'ios':
       case 'windows':
         return true;
     }
@@ -57,6 +66,9 @@ class KeyEventSimulator {
         break;
       case 'macos':
         map = kMacOsToPhysicalKey;
+        break;
+      case 'ios':
+        map = kIosToPhysicalKey;
         break;
       case 'linux':
         map = kLinuxToPhysicalKey;
@@ -81,37 +93,47 @@ class KeyEventSimulator {
 
   static int _getKeyCode(LogicalKeyboardKey key, String platform) {
     assert(_osIsSupported(platform), 'Platform $platform not supported for key simulation');
-    late Map<int, LogicalKeyboardKey> map;
-    switch (platform) {
-      case 'android':
-        map = kAndroidToLogicalKey;
-        break;
-      case 'fuchsia':
-        map = kFuchsiaToLogicalKey;
-        break;
-      case 'macos':
+    if (kIsWeb) {
+      // web doesn't have int type code. This check is used to treeshake
+      // keyboard map code.
+      return -1;
+    } else {
+      late Map<int, LogicalKeyboardKey> map;
+      switch (platform) {
+        case 'android':
+          map = kAndroidToLogicalKey;
+          break;
+        case 'fuchsia':
+          map = kFuchsiaToLogicalKey;
+          break;
+        case 'macos':
         // macOS doesn't do key codes, just scan codes.
-        return -1;
-      case 'web':
-        // web doesn't have int type code
-        return -1;
-      case 'linux':
-        map = kGlfwToLogicalKey;
-        break;
-      case 'windows':
-        map = kWindowsToLogicalKey;
-        break;
-    }
-    int? keyCode;
-    for (final int code in map.keys) {
-      if (key.keyId == map[code]!.keyId) {
-        keyCode = code;
-        break;
+          return -1;
+        case 'ios':
+        // iOS doesn't do key codes, just scan codes.
+          return -1;
+        case 'web':
+          // web doesn't have int type code.
+          return -1;
+        case 'linux':
+          map = kGlfwToLogicalKey;
+          break;
+        case 'windows':
+          map = kWindowsToLogicalKey;
+          break;
       }
+      int? keyCode;
+      for (final int code in map.keys) {
+        if (key.keyId == map[code]!.keyId) {
+          keyCode = code;
+          break;
+        }
+      }
+      assert(keyCode != null, 'Key $key not found in $platform keyCode map');
+      return keyCode!;
     }
-    assert(keyCode != null, 'Key $key not found in $platform keyCode map');
-    return keyCode!;
   }
+
   static String _getWebKeyCode(LogicalKeyboardKey key) {
     String? result;
     for (final String code in kWebToLogicalKey.keys) {
@@ -127,25 +149,33 @@ class KeyEventSimulator {
   static PhysicalKeyboardKey _findPhysicalKey(LogicalKeyboardKey key, String platform) {
     assert(_osIsSupported(platform), 'Platform $platform not supported for key simulation');
     late Map<dynamic, PhysicalKeyboardKey> map;
-    switch (platform) {
-      case 'android':
-        map = kAndroidToPhysicalKey;
-        break;
-      case 'fuchsia':
-        map = kFuchsiaToPhysicalKey;
-        break;
-      case 'macos':
-        map = kMacOsToPhysicalKey;
-        break;
-      case 'linux':
-        map = kLinuxToPhysicalKey;
-        break;
-      case 'web':
-        map = kWebToPhysicalKey;
-        break;
-      case 'windows':
-        map = kWindowsToPhysicalKey;
-        break;
+    if (kIsWeb) {
+      // This check is used to treeshake keymap code.
+      map = kWebToPhysicalKey;
+    } else {
+      switch (platform) {
+        case 'android':
+          map = kAndroidToPhysicalKey;
+          break;
+        case 'fuchsia':
+          map = kFuchsiaToPhysicalKey;
+          break;
+        case 'macos':
+          map = kMacOsToPhysicalKey;
+          break;
+        case 'ios':
+          map = kIosToPhysicalKey;
+          break;
+        case 'linux':
+          map = kLinuxToPhysicalKey;
+          break;
+        case 'web':
+          map = kWebToPhysicalKey;
+          break;
+        case 'windows':
+          map = kWindowsToPhysicalKey;
+          break;
+      }
     }
     PhysicalKeyboardKey? result;
     for (final PhysicalKeyboardKey physicalKey in map.values) {
@@ -181,20 +211,27 @@ class KeyEventSimulator {
       'keymap': platform,
     };
 
+    if (kIsWeb) {
+      result['code'] = _getWebKeyCode(key);
+      result['key'] = _keyLabel(key);
+      result['metaState'] = _getWebModifierFlags(key, isDown);
+      return result;
+    }
+
     switch (platform) {
       case 'android':
         result['keyCode'] = keyCode;
-        if (key.keyLabel.isNotEmpty) {
-          result['codePoint'] = key.keyLabel.codeUnitAt(0);
-          result['character'] = key.keyLabel;
+        if (_keyLabel(key).isNotEmpty) {
+          result['codePoint'] = _keyLabel(key).codeUnitAt(0);
+          result['character'] = _keyLabel(key);
         }
         result['scanCode'] = scanCode;
         result['metaState'] = _getAndroidModifierFlags(key, isDown);
         break;
       case 'fuchsia':
         result['hidUsage'] = physicalKey.usbHidUsage;
-        if (key.keyLabel.isNotEmpty) {
-          result['codePoint'] = key.keyLabel.codeUnitAt(0);
+        if (_keyLabel(key).isNotEmpty) {
+          result['codePoint'] = _keyLabel(key).codeUnitAt(0);
         }
         result['modifiers'] = _getFuchsiaModifierFlags(key, isDown);
         break;
@@ -203,26 +240,32 @@ class KeyEventSimulator {
         result['keyCode'] = keyCode;
         result['scanCode'] = scanCode;
         result['modifiers'] = _getGlfwModifierFlags(key, isDown);
-        result['unicodeScalarValues'] = key.keyLabel.isNotEmpty ? key.keyLabel.codeUnitAt(0) : 0;
+        result['unicodeScalarValues'] = _keyLabel(key).isNotEmpty ? _keyLabel(key).codeUnitAt(0) : 0;
         break;
       case 'macos':
         result['keyCode'] = scanCode;
-        if (key.keyLabel.isNotEmpty) {
-          result['characters'] = key.keyLabel;
-          result['charactersIgnoringModifiers'] = key.keyLabel;
+        if (_keyLabel(key).isNotEmpty) {
+          result['characters'] = _keyLabel(key);
+          result['charactersIgnoringModifiers'] = _keyLabel(key);
         }
         result['modifiers'] = _getMacOsModifierFlags(key, isDown);
         break;
+      case 'ios':
+        result['keyCode'] = scanCode;
+        result['characters'] = _keyLabel(key);
+        result['charactersIgnoringModifiers'] = _keyLabel(key);
+        result['modifiers'] = _getIOSModifierFlags(key, isDown);
+        break;
       case 'web':
         result['code'] = _getWebKeyCode(key);
-        result['key'] = key.keyLabel;
+        result['key'] = _keyLabel(key);
         result['metaState'] = _getWebModifierFlags(key, isDown);
         break;
       case 'windows':
         result['keyCode'] = keyCode;
         result['scanCode'] = scanCode;
-        if (key.keyLabel.isNotEmpty) {
-          result['characterCodePoint'] = key.keyLabel.codeUnitAt(0);
+        if (_keyLabel(key).isNotEmpty) {
+          result['characterCodePoint'] = _keyLabel(key).codeUnitAt(0);
         }
         result['modifiers'] = _getWindowsModifierFlags(key, isDown);
     }
@@ -504,6 +547,73 @@ class KeyEventSimulator {
     return result;
   }
 
+  static int _getIOSModifierFlags(LogicalKeyboardKey newKey, bool isDown) {
+    int result = 0;
+    final Set<LogicalKeyboardKey> pressed = RawKeyboard.instance.keysPressed;
+    if (isDown) {
+      pressed.add(newKey);
+    } else {
+      pressed.remove(newKey);
+    }
+    if (pressed.contains(LogicalKeyboardKey.shiftLeft)) {
+      result |= RawKeyEventDataIos.modifierLeftShift | RawKeyEventDataIos.modifierShift;
+    }
+    if (pressed.contains(LogicalKeyboardKey.shiftRight)) {
+      result |= RawKeyEventDataIos.modifierRightShift | RawKeyEventDataIos.modifierShift;
+    }
+    if (pressed.contains(LogicalKeyboardKey.metaLeft)) {
+      result |= RawKeyEventDataIos.modifierLeftCommand | RawKeyEventDataIos.modifierCommand;
+    }
+    if (pressed.contains(LogicalKeyboardKey.metaRight)) {
+      result |= RawKeyEventDataIos.modifierRightCommand | RawKeyEventDataIos.modifierCommand;
+    }
+    if (pressed.contains(LogicalKeyboardKey.controlLeft)) {
+      result |= RawKeyEventDataIos.modifierLeftControl | RawKeyEventDataIos.modifierControl;
+    }
+    if (pressed.contains(LogicalKeyboardKey.controlRight)) {
+      result |= RawKeyEventDataIos.modifierRightControl | RawKeyEventDataIos.modifierControl;
+    }
+    if (pressed.contains(LogicalKeyboardKey.altLeft)) {
+      result |= RawKeyEventDataIos.modifierLeftOption | RawKeyEventDataIos.modifierOption;
+    }
+    if (pressed.contains(LogicalKeyboardKey.altRight)) {
+      result |= RawKeyEventDataIos.modifierRightOption | RawKeyEventDataIos.modifierOption;
+    }
+    final Set<LogicalKeyboardKey> functionKeys = <LogicalKeyboardKey>{
+      LogicalKeyboardKey.f1,
+      LogicalKeyboardKey.f2,
+      LogicalKeyboardKey.f3,
+      LogicalKeyboardKey.f4,
+      LogicalKeyboardKey.f5,
+      LogicalKeyboardKey.f6,
+      LogicalKeyboardKey.f7,
+      LogicalKeyboardKey.f8,
+      LogicalKeyboardKey.f9,
+      LogicalKeyboardKey.f10,
+      LogicalKeyboardKey.f11,
+      LogicalKeyboardKey.f12,
+      LogicalKeyboardKey.f13,
+      LogicalKeyboardKey.f14,
+      LogicalKeyboardKey.f15,
+      LogicalKeyboardKey.f16,
+      LogicalKeyboardKey.f17,
+      LogicalKeyboardKey.f18,
+      LogicalKeyboardKey.f19,
+      LogicalKeyboardKey.f20,
+      LogicalKeyboardKey.f21,
+    };
+    if (pressed.intersection(functionKeys).isNotEmpty) {
+      result |= RawKeyEventDataIos.modifierFunction;
+    }
+    if (pressed.intersection(kMacOsNumPadMap.values.toSet()).isNotEmpty) {
+      result |= RawKeyEventDataIos.modifierNumericPad;
+    }
+    if (pressed.contains(LogicalKeyboardKey.capsLock)) {
+      result |= RawKeyEventDataIos.modifierCapsLock;
+    }
+    return result;
+  }
+
   /// Simulates sending a hardware key down event through the system channel.
   ///
   /// This only simulates key presses coming from a physical keyboard, not from a
@@ -516,20 +626,32 @@ class KeyEventSimulator {
   ///
   /// Keys that are down when the test completes are cleared after each test.
   ///
+  /// Returns true if the key event was handled by the framework.
+  ///
   /// See also:
   ///
   ///  - [simulateKeyUpEvent] to simulate the corresponding key up event.
-  static Future<void> simulateKeyDownEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) async {
-    return TestAsyncUtils.guard<void>(() async {
+  static Future<bool> simulateKeyDownEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) async {
+    return TestAsyncUtils.guard<bool>(() async {
       platform ??= Platform.operatingSystem;
       assert(_osIsSupported(platform!), 'Platform $platform not supported for key simulation');
 
       final Map<String, dynamic> data = getKeyData(key, platform: platform!, isDown: true, physicalKey: physicalKey);
+      bool result = false;
       await ServicesBinding.instance!.defaultBinaryMessenger.handlePlatformMessage(
         SystemChannels.keyEvent.name,
         SystemChannels.keyEvent.codec.encodeMessage(data),
-            (ByteData? data) { },
+        (ByteData? data) {
+          if (data == null) {
+            return;
+          }
+          final Map<String, dynamic> decoded = SystemChannels.keyEvent.codec.decodeMessage(data) as Map<String, dynamic>;
+          if (decoded['handled'] as bool) {
+            result = true;
+          }
+        }
       );
+      return result;
     });
   }
 
@@ -543,20 +665,32 @@ class KeyEventSimulator {
   /// system. Defaults to the operating system that the test is running on. Some
   /// platforms (e.g. Windows, iOS) are not yet supported.
   ///
+  /// Returns true if the key event was handled by the framework.
+  ///
   /// See also:
   ///
   ///  - [simulateKeyDownEvent] to simulate the corresponding key down event.
-  static Future<void> simulateKeyUpEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) async {
-    return TestAsyncUtils.guard<void>(() async {
+  static Future<bool> simulateKeyUpEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) async {
+    return TestAsyncUtils.guard<bool>(() async {
       platform ??= Platform.operatingSystem;
       assert(_osIsSupported(platform!), 'Platform $platform not supported for key simulation');
 
       final Map<String, dynamic> data = getKeyData(key, platform: platform!, isDown: false, physicalKey: physicalKey);
+      bool result = false;
       await ServicesBinding.instance!.defaultBinaryMessenger.handlePlatformMessage(
         SystemChannels.keyEvent.name,
         SystemChannels.keyEvent.codec.encodeMessage(data),
-            (ByteData? data) { },
+        (ByteData? data) {
+          if (data == null) {
+            return;
+          }
+          final Map<String, dynamic> decoded = SystemChannels.keyEvent.codec.decodeMessage(data) as Map<String, dynamic>;
+          if (decoded['handled'] as bool) {
+            result = true;
+          }
+        }
       );
+      return result;
     });
   }
 }
@@ -576,10 +710,12 @@ class KeyEventSimulator {
 ///
 /// Keys that are down when the test completes are cleared after each test.
 ///
+/// Returns true if the key event was handled by the framework.
+///
 /// See also:
 ///
 ///  - [simulateKeyUpEvent] to simulate the corresponding key up event.
-Future<void> simulateKeyDownEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) {
+Future<bool> simulateKeyDownEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) {
   return KeyEventSimulator.simulateKeyDownEvent(key, platform: platform, physicalKey: physicalKey);
 }
 
@@ -596,9 +732,11 @@ Future<void> simulateKeyDownEvent(LogicalKeyboardKey key, {String? platform, Phy
 /// system. Defaults to the operating system that the test is running on. Some
 /// platforms (e.g. Windows, iOS) are not yet supported.
 ///
+/// Returns true if the key event was handled by the framework.
+///
 /// See also:
 ///
 ///  - [simulateKeyDownEvent] to simulate the corresponding key down event.
-Future<void> simulateKeyUpEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) {
+Future<bool> simulateKeyUpEvent(LogicalKeyboardKey key, {String? platform, PhysicalKeyboardKey? physicalKey}) {
   return KeyEventSimulator.simulateKeyUpEvent(key, platform: platform, physicalKey: physicalKey);
 }

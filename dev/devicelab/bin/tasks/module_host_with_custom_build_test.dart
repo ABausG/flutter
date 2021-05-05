@@ -29,6 +29,11 @@ Future<void> main() async {
 
     section('Create Flutter module project');
 
+    await flutter(
+      'precache',
+      options: <String>['--android', '--no-ios'],
+    );
+
     final Directory tempDir = Directory.systemTemp.createTempSync('flutter_module_test.');
     final Directory projectDir = Directory(path.join(tempDir.path, 'hello'));
     try {
@@ -72,7 +77,7 @@ Future<void> main() async {
         Directory(path.join(hostAppDir.path, 'gradle', 'wrapper')),
       );
 
-      final Function clean = () async {
+      Future<void> clean() async {
         section('Clean');
         await inDirectory(hostAppDir, () async {
           await exec(gradlewExecutable,
@@ -82,7 +87,7 @@ Future<void> main() async {
             },
           );
         });
-      };
+      }
 
       if (!Platform.isWindows) {
         section('Make $gradlewExecutable executable');

@@ -6,21 +6,12 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 
-import '../base/context.dart';
 import '../convert.dart';
-import '../globals.dart' as globals;
 import 'io.dart';
-import 'terminal.dart' show AnsiTerminal, Terminal, TerminalColor, OutputPreferences;
+import 'terminal.dart' show Terminal, TerminalColor, OutputPreferences;
 import 'utils.dart';
 
 const int kDefaultStatusPadding = 59;
-const Duration _kFastOperation = Duration(seconds: 2);
-const Duration _kSlowOperation = Duration(minutes: 2);
-
-/// The [TimeoutConfiguration] instance.
-///
-/// If not provided via injection, a default instance is provided.
-TimeoutConfiguration get timeoutConfiguration => context.get<TimeoutConfiguration>() ?? const TimeoutConfiguration();
 
 /// A factory for generating [Stopwatch] instances for [Status] instances.
 class StopwatchFactory {
@@ -29,22 +20,6 @@ class StopwatchFactory {
 
   /// Create a new [Stopwatch] instance.
   Stopwatch createStopwatch() => Stopwatch();
-}
-
-class TimeoutConfiguration {
-  const TimeoutConfiguration();
-
-  /// The expected time that various "slow" operations take, such as running
-  /// the analyzer.
-  ///
-  /// Defaults to 2 minutes.
-  Duration get slowOperation => _kSlowOperation;
-
-  /// The expected time that various "fast" operations take, such as a hot
-  /// reload.
-  ///
-  /// Defaults to 2 seconds.
-  Duration get fastOperation => _kFastOperation;
 }
 
 typedef VoidCallback = void Function();
@@ -58,11 +33,9 @@ abstract class Logger {
 
   bool get hasTerminal;
 
-  Terminal get _terminal;
+  Terminal get terminal;
 
   OutputPreferences get _outputPreferences;
-
-  TimeoutConfiguration get _timeoutConfiguration;
 
   /// Display an error `message` to the user. Commands should use this if they
   /// fail in some way.
@@ -90,12 +63,12 @@ abstract class Logger {
   /// `outputPreferences.wrapText` setting.
   void printError(
     String message, {
-    StackTrace stackTrace,
-    bool emphasis,
-    TerminalColor color,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    StackTrace? stackTrace,
+    bool? emphasis,
+    TerminalColor? color,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   });
 
   /// Display normal output of the command. This should be used for things like
@@ -128,12 +101,12 @@ abstract class Logger {
   /// `outputPreferences.wrapText` setting.
   void printStatus(
     String message, {
-    bool emphasis,
-    TerminalColor color,
-    bool newline,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    bool? emphasis,
+    TerminalColor? color,
+    bool? newline,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   });
 
   /// Use this for verbose tracing output. Users can turn this output on in order
@@ -144,12 +117,6 @@ abstract class Logger {
   ///
   /// The `message` argument is the message to display to the user.
   ///
-  /// The `timeout` argument sets a duration after which an additional message
-  /// may be shown saying that the operation is taking a long time. (Not all
-  /// [Status] subclasses show such a message.) Set this to null if the
-  /// operation can legitimately take an arbitrary amount of time (e.g. waiting
-  /// for the user).
-  ///
   /// The `progressId` argument provides an ID that can be used to identify
   /// this type of progress (e.g. `hot.reload`, `hot.restart`).
   ///
@@ -157,17 +124,20 @@ abstract class Logger {
   /// between the `message` and the progress indicator, if any.
   Status startProgress(
     String message, {
-    @required Duration timeout,
-    String progressId,
+    String? progressId,
     bool multilineOutput = false,
     int progressIndicatorPadding = kDefaultStatusPadding,
   });
+
+  /// A [SilentStatus] or an [AnsiSpinner] (depending on whether the
+  /// terminal is fancy enough), already started.
+  Status startSpinner({ VoidCallback? onFinish });
 
   /// Send an event to be emitted.
   ///
   /// Only surfaces a value in machine modes, Loggers may ignore this message in
   /// non-machine modes.
-  void sendEvent(String name, [Map<String, dynamic> args]) { }
+  void sendEvent(String name, [Map<String, dynamic>? args]) { }
 
   /// Clears all output.
   void clear();
@@ -193,19 +163,23 @@ class DelegatingLogger implements Logger {
   bool get hasTerminal => _delegate.hasTerminal;
 
   @override
-  Terminal get _terminal => _delegate._terminal;
+  Terminal get terminal => _delegate.terminal;
 
   @override
   OutputPreferences get _outputPreferences => _delegate._outputPreferences;
 
   @override
-  TimeoutConfiguration get _timeoutConfiguration => _delegate._timeoutConfiguration;
-
-  @override
   bool get isVerbose => _delegate.isVerbose;
 
   @override
-  void printError(String message, {StackTrace stackTrace, bool emphasis, TerminalColor color, int indent, int hangingIndent, bool wrap}) {
+  void printError(String message, {
+    StackTrace? stackTrace,
+    bool? emphasis,
+    TerminalColor? color,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
+  }) {
     _delegate.printError(
       message,
       stackTrace: stackTrace,
@@ -218,7 +192,14 @@ class DelegatingLogger implements Logger {
   }
 
   @override
-  void printStatus(String message, {bool emphasis, TerminalColor color, bool newline, int indent, int hangingIndent, bool wrap}) {
+  void printStatus(String message, {
+    bool? emphasis,
+    TerminalColor? color,
+    bool? newline,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
+  }) {
     _delegate.printStatus(message,
       emphasis: emphasis,
       color: color,
@@ -235,18 +216,26 @@ class DelegatingLogger implements Logger {
   }
 
   @override
-  void sendEvent(String name, [Map<String, dynamic> args]) {
+  void sendEvent(String name, [Map<String, dynamic>? args]) {
     _delegate.sendEvent(name, args);
   }
 
   @override
-  Status startProgress(String message, {Duration timeout, String progressId, bool multilineOutput = false, int progressIndicatorPadding = kDefaultStatusPadding}) {
+  Status startProgress(String message, {
+    String? progressId,
+    bool multilineOutput = false,
+    int progressIndicatorPadding = kDefaultStatusPadding,
+  }) {
     return _delegate.startProgress(message,
-      timeout: timeout,
       progressId: progressId,
       multilineOutput: multilineOutput,
       progressIndicatorPadding: progressIndicatorPadding,
     );
+  }
+
+  @override
+  Status startSpinner({VoidCallback? onFinish}) {
+    return _delegate.startSpinner(onFinish: onFinish);
   }
 
   @override
@@ -267,7 +256,7 @@ T asLogger<T extends Logger>(Logger logger) {
     if (logger is T) {
       return logger;
     } else if (logger is DelegatingLogger) {
-      logger = (logger as DelegatingLogger)._delegate;
+      logger = logger._delegate;
     } else {
       throw StateError('$original has no ancestor delegate of type $T');
     }
@@ -276,34 +265,29 @@ T asLogger<T extends Logger>(Logger logger) {
 
 class StdoutLogger extends Logger {
   StdoutLogger({
-    @required Terminal terminal,
-    @required Stdio stdio,
-    @required OutputPreferences outputPreferences,
-    @required TimeoutConfiguration timeoutConfiguration,
+    required this.terminal,
+    required Stdio stdio,
+    required OutputPreferences outputPreferences,
     StopwatchFactory stopwatchFactory = const StopwatchFactory(),
   })
     : _stdio = stdio,
-      _terminal = terminal,
-      _timeoutConfiguration = timeoutConfiguration,
       _outputPreferences = outputPreferences,
       _stopwatchFactory = stopwatchFactory;
 
   @override
-  final Terminal _terminal;
+  final Terminal terminal;
   @override
   final OutputPreferences _outputPreferences;
-  @override
-  final TimeoutConfiguration _timeoutConfiguration;
   final Stdio _stdio;
   final StopwatchFactory _stopwatchFactory;
 
-  Status _status;
+  Status? _status;
 
   @override
   bool get isVerbose => false;
 
   @override
-  bool get supportsColor => _terminal.supportsColor;
+  bool get supportsColor => terminal.supportsColor;
 
   @override
   bool get hasTerminal => _stdio.stdinHasTerminal;
@@ -311,15 +295,14 @@ class StdoutLogger extends Logger {
   @override
   void printError(
     String message, {
-    StackTrace stackTrace,
-    bool emphasis,
-    TerminalColor color,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    StackTrace? stackTrace,
+    bool? emphasis,
+    TerminalColor? color,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   }) {
     _status?.pause();
-    message ??= '';
     message = wrapText(message,
       indent: indent,
       hangingIndent: hangingIndent,
@@ -327,9 +310,9 @@ class StdoutLogger extends Logger {
       columnWidth: _outputPreferences.wrapColumn,
     );
     if (emphasis == true) {
-      message = _terminal.bolden(message);
+      message = terminal.bolden(message);
     }
-    message = _terminal.color(message, color ?? TerminalColor.red);
+    message = terminal.color(message, color ?? TerminalColor.red);
     writeToStdErr('$message\n');
     if (stackTrace != null) {
       writeToStdErr('$stackTrace\n');
@@ -340,15 +323,14 @@ class StdoutLogger extends Logger {
   @override
   void printStatus(
     String message, {
-    bool emphasis,
-    TerminalColor color,
-    bool newline,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    bool? emphasis,
+    TerminalColor? color,
+    bool? newline,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   }) {
     _status?.pause();
-    message ??= '';
     message = wrapText(message,
       indent: indent,
       hangingIndent: hangingIndent,
@@ -356,10 +338,10 @@ class StdoutLogger extends Logger {
       columnWidth: _outputPreferences.wrapColumn,
     );
     if (emphasis == true) {
-      message = _terminal.bolden(message);
+      message = terminal.bolden(message);
     }
     if (color != null) {
-      message = _terminal.color(message, color);
+      message = terminal.color(message, color);
     }
     if (newline != false) {
       message = '$message\n';
@@ -380,45 +362,53 @@ class StdoutLogger extends Logger {
   @override
   Status startProgress(
     String message, {
-    @required Duration timeout,
-    String progressId,
+    String? progressId,
     bool multilineOutput = false,
     int progressIndicatorPadding = kDefaultStatusPadding,
   }) {
-    assert(progressIndicatorPadding != null);
     if (_status != null) {
       // Ignore nested progresses; return a no-op status object.
       return SilentStatus(
-        timeout: timeout,
         onFinish: _clearStatus,
-        timeoutConfiguration: _timeoutConfiguration,
         stopwatch: _stopwatchFactory.createStopwatch(),
       )..start();
     }
     if (supportsColor) {
       _status = AnsiStatus(
         message: message,
-        timeout: timeout,
         multilineOutput: multilineOutput,
         padding: progressIndicatorPadding,
         onFinish: _clearStatus,
         stdio: _stdio,
-        timeoutConfiguration: _timeoutConfiguration,
         stopwatch: _stopwatchFactory.createStopwatch(),
-        terminal: _terminal,
+        terminal: terminal,
       )..start();
     } else {
       _status = SummaryStatus(
         message: message,
-        timeout: timeout,
         padding: progressIndicatorPadding,
         onFinish: _clearStatus,
         stdio: _stdio,
-        timeoutConfiguration: _timeoutConfiguration,
         stopwatch: _stopwatchFactory.createStopwatch(),
       )..start();
     }
-    return _status;
+    return _status!;
+  }
+
+  @override
+  Status startSpinner({ VoidCallback? onFinish }) {
+    if (terminal.supportsColor) {
+      return AnsiSpinner(
+        onFinish: onFinish,
+        stopwatch: _stopwatchFactory.createStopwatch(),
+        terminal: terminal,
+        stdio: _stdio,
+      )..start();
+    }
+    return SilentStatus(
+      onFinish: onFinish,
+      stopwatch: _stopwatchFactory.createStopwatch(),
+    )..start();
   }
 
   void _clearStatus() {
@@ -426,12 +416,12 @@ class StdoutLogger extends Logger {
   }
 
   @override
-  void sendEvent(String name, [Map<String, dynamic> args]) { }
+  void sendEvent(String name, [Map<String, dynamic>? args]) { }
 
   @override
   void clear() {
     _status?.pause();
-    writeToStdOut(_terminal.clearScreen() + '\n');
+    writeToStdOut(terminal.clearScreen() + '\n');
     _status?.resume();
   }
 }
@@ -446,51 +436,46 @@ class StdoutLogger extends Logger {
 /// they will show up as the unrepresentable character symbol '�'.
 class WindowsStdoutLogger extends StdoutLogger {
   WindowsStdoutLogger({
-    @required Terminal terminal,
-    @required Stdio stdio,
-    @required OutputPreferences outputPreferences,
-    @required TimeoutConfiguration timeoutConfiguration,
+    required Terminal terminal,
+    required Stdio stdio,
+    required OutputPreferences outputPreferences,
     StopwatchFactory stopwatchFactory = const StopwatchFactory(),
   }) : super(
       terminal: terminal,
       stdio: stdio,
       outputPreferences: outputPreferences,
-      timeoutConfiguration: timeoutConfiguration,
       stopwatchFactory: stopwatchFactory,
     );
 
   @override
   void writeToStdOut(String message) {
-    // TODO(jcollins-g): wrong abstraction layer for this, move to [Stdio].
-    final String windowsMessage = _terminal.supportsEmoji
+    final String windowsMessage = terminal.supportsEmoji
       ? message
       : message.replaceAll('🔥', '')
                .replaceAll('🖼️', '')
                .replaceAll('✗', 'X')
                .replaceAll('✓', '√')
-               .replaceAll('🔨', '');
+               .replaceAll('🔨', '')
+               .replaceAll('💪', '')
+               .replaceAll('✏️', '');
     _stdio.stdoutWrite(windowsMessage);
   }
 }
 
 class BufferLogger extends Logger {
   BufferLogger({
-    @required AnsiTerminal terminal,
-    @required OutputPreferences outputPreferences,
-    TimeoutConfiguration timeoutConfiguration = const TimeoutConfiguration(),
+    required this.terminal,
+    required OutputPreferences outputPreferences,
     StopwatchFactory stopwatchFactory = const StopwatchFactory(),
   }) : _outputPreferences = outputPreferences,
-       _terminal = terminal,
-       _timeoutConfiguration = timeoutConfiguration,
        _stopwatchFactory = stopwatchFactory;
 
   /// Create a [BufferLogger] with test preferences.
   BufferLogger.test({
-    Terminal terminal,
-    OutputPreferences outputPreferences,
-  }) : _terminal = terminal ?? Terminal.test(),
+    Terminal? terminal,
+    OutputPreferences? outputPreferences,
+  }) : terminal = terminal ?? Terminal.test(),
        _outputPreferences = outputPreferences ?? OutputPreferences.test(),
-       _timeoutConfiguration = const TimeoutConfiguration(),
        _stopwatchFactory = const StopwatchFactory();
 
 
@@ -498,10 +483,7 @@ class BufferLogger extends Logger {
   final OutputPreferences _outputPreferences;
 
   @override
-  final Terminal _terminal;
-
-  @override
-  final TimeoutConfiguration _timeoutConfiguration;
+  final Terminal terminal;
 
   final StopwatchFactory _stopwatchFactory;
 
@@ -509,7 +491,7 @@ class BufferLogger extends Logger {
   bool get isVerbose => false;
 
   @override
-  bool get supportsColor => _terminal.supportsColor;
+  bool get supportsColor => terminal.supportsColor;
 
   final StringBuffer _error = StringBuffer();
   final StringBuffer _status = StringBuffer();
@@ -527,14 +509,14 @@ class BufferLogger extends Logger {
   @override
   void printError(
     String message, {
-    StackTrace stackTrace,
-    bool emphasis,
-    TerminalColor color,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    StackTrace? stackTrace,
+    bool? emphasis,
+    TerminalColor? color,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   }) {
-    _error.writeln(_terminal.color(
+    _error.writeln(terminal.color(
       wrapText(message,
         indent: indent,
         hangingIndent: hangingIndent,
@@ -548,12 +530,12 @@ class BufferLogger extends Logger {
   @override
   void printStatus(
     String message, {
-    bool emphasis,
-    TerminalColor color,
-    bool newline,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    bool? emphasis,
+    TerminalColor? color,
+    bool? newline,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   }) {
     if (newline != false) {
       _status.writeln(wrapText(message,
@@ -578,17 +560,22 @@ class BufferLogger extends Logger {
   @override
   Status startProgress(
     String message, {
-    @required Duration timeout,
-    String progressId,
+    String? progressId,
     bool multilineOutput = false,
     int progressIndicatorPadding = kDefaultStatusPadding,
   }) {
     assert(progressIndicatorPadding != null);
     printStatus(message);
     return SilentStatus(
-      timeout: timeout,
-      timeoutConfiguration: _timeoutConfiguration,
       stopwatch: _stopwatchFactory.createStopwatch(),
+    )..start();
+  }
+
+  @override
+  Status startSpinner({VoidCallback? onFinish}) {
+    return SilentStatus(
+      stopwatch: _stopwatchFactory.createStopwatch(),
+      onFinish: onFinish,
     )..start();
   }
 
@@ -601,8 +588,8 @@ class BufferLogger extends Logger {
   }
 
   @override
-  void sendEvent(String name, [Map<String, dynamic> args]) {
-    _events.write(json.encode(<String, Object>{
+  void sendEvent(String name, [Map<String, dynamic>? args]) {
+    _events.write(json.encode(<String, Object?>{
       'name': name,
       'args': args
     }));
@@ -628,12 +615,12 @@ class VerboseLogger extends DelegatingLogger {
   @override
   void printError(
     String message, {
-    StackTrace stackTrace,
-    bool emphasis,
-    TerminalColor color,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    StackTrace? stackTrace,
+    bool? emphasis,
+    TerminalColor? color,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   }) {
     _emit(
       _LogType.error,
@@ -650,12 +637,12 @@ class VerboseLogger extends DelegatingLogger {
   @override
   void printStatus(
     String message, {
-    bool emphasis,
-    TerminalColor color,
-    bool newline,
-    int indent,
-    int hangingIndent,
-    bool wrap,
+    bool? emphasis,
+    TerminalColor? color,
+    bool? newline,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
   }) {
     _emit(_LogType.status, wrapText(message,
       indent: indent,
@@ -673,8 +660,7 @@ class VerboseLogger extends DelegatingLogger {
   @override
   Status startProgress(
     String message, {
-    @required Duration timeout,
-    String progressId,
+    String? progressId,
     bool multilineOutput = false,
     int progressIndicatorPadding = kDefaultStatusPadding,
   }) {
@@ -682,27 +668,21 @@ class VerboseLogger extends DelegatingLogger {
     printStatus(message);
     final Stopwatch timer = _stopwatchFactory.createStopwatch()..start();
     return SilentStatus(
-      timeout: timeout,
-      timeoutConfiguration: _timeoutConfiguration,
       // This is intentionally a different stopwatch than above.
       stopwatch: _stopwatchFactory.createStopwatch(),
       onFinish: () {
         String time;
-        if (timeout == null || timeout > _timeoutConfiguration.fastOperation) {
+        if (timer.elapsed.inSeconds > 2) {
           time = getElapsedAsSeconds(timer.elapsed);
         } else {
           time = getElapsedAsMilliseconds(timer.elapsed);
         }
-        if (timeout != null && timer.elapsed > timeout) {
-          printTrace('$message (completed in $time, longer than expected)');
-        } else {
-          printTrace('$message (completed in $time)');
-        }
+        printTrace('$message (completed in $time)');
       },
     )..start();
   }
 
-  void _emit(_LogType type, String message, [ StackTrace stackTrace ]) {
+  void _emit(_LogType type, String message, [ StackTrace? stackTrace ]) {
     if (message.trim().isEmpty) {
       return;
     }
@@ -717,7 +697,7 @@ class VerboseLogger extends DelegatingLogger {
     } else {
       prefix = '+$millis ms'.padLeft(prefixWidth);
       if (millis >= 100) {
-        prefix = _terminal.bolden(prefix);
+        prefix = terminal.bolden(prefix);
       }
     }
     prefix = '[$prefix] ';
@@ -726,19 +706,47 @@ class VerboseLogger extends DelegatingLogger {
     final String indentMessage = message.replaceAll('\n', '\n$indent');
 
     if (type == _LogType.error) {
-      super.printError(prefix + _terminal.bolden(indentMessage));
+      super.printError(prefix + terminal.bolden(indentMessage));
       if (stackTrace != null) {
         super.printError(indent + stackTrace.toString().replaceAll('\n', '\n$indent'));
       }
     } else if (type == _LogType.status) {
-      super.printStatus(prefix + _terminal.bolden(indentMessage));
+      super.printStatus(prefix + terminal.bolden(indentMessage));
     } else {
       super.printStatus(prefix + indentMessage);
     }
   }
 
   @override
-  void sendEvent(String name, [Map<String, dynamic> args]) { }
+  void sendEvent(String name, [Map<String, dynamic>? args]) { }
+}
+
+class PrefixedErrorLogger extends DelegatingLogger {
+  PrefixedErrorLogger(Logger parent) : super(parent);
+
+  @override
+  void printError(
+    String message, {
+    StackTrace? stackTrace,
+    bool? emphasis,
+    TerminalColor? color,
+    int? indent,
+    int? hangingIndent,
+    bool? wrap,
+  }) {
+    if (message.trim().isNotEmpty == true) {
+      message = 'ERROR: $message';
+    }
+    super.printError(
+      message,
+      stackTrace: stackTrace,
+      emphasis: emphasis,
+      color: color,
+      indent: indent,
+      hangingIndent: hangingIndent,
+      wrap: wrap,
+    );
+  }
 }
 
 enum _LogType { error, status, trace }
@@ -747,9 +755,6 @@ typedef SlowWarningCallback = String Function();
 
 /// A [Status] class begins when start is called, and may produce progress
 /// information asynchronously.
-///
-/// Some subclasses change output once [timeout] has expired, to indicate that
-/// something is taking longer than expected.
 ///
 /// The [SilentStatus] class never has any output.
 ///
@@ -767,55 +772,18 @@ typedef SlowWarningCallback = String Function();
 /// a [Status] or one of its subclasses.
 abstract class Status {
   Status({
-    @required this.timeout,
-    @required TimeoutConfiguration timeoutConfiguration,
     this.onFinish,
-    @required Stopwatch stopwatch,
-  }) : _timeoutConfiguration = timeoutConfiguration,
-       _stopwatch = stopwatch;
+    required Stopwatch stopwatch,
+  }) : _stopwatch = stopwatch;
 
-  /// A [SilentStatus] or an [AnsiSpinner] (depending on whether the
-  /// terminal is fancy enough), already started.
-  factory Status.withSpinner({
-    @required Duration timeout,
-    @required TimeoutConfiguration timeoutConfiguration,
-    @required Stopwatch stopwatch,
-    @required Terminal terminal,
-    VoidCallback onFinish,
-    SlowWarningCallback slowWarningCallback,
-  }) {
-    if (terminal.supportsColor) {
-      return AnsiSpinner(
-        timeout: timeout,
-        onFinish: onFinish,
-        slowWarningCallback: slowWarningCallback,
-        timeoutConfiguration: timeoutConfiguration,
-        stopwatch: stopwatch,
-        terminal: terminal,
-      )..start();
-    }
-    return SilentStatus(
-      timeout: timeout,
-      onFinish: onFinish,
-      timeoutConfiguration: timeoutConfiguration,
-      stopwatch: stopwatch,
-    )..start();
-  }
-
-  final Duration timeout;
-  final VoidCallback onFinish;
-  final TimeoutConfiguration _timeoutConfiguration;
+  final VoidCallback? onFinish;
 
   @protected
   final Stopwatch _stopwatch;
 
   @protected
-  @visibleForTesting
-  bool get seemsSlow => timeout != null && _stopwatch.elapsed > timeout;
-
-  @protected
   String get elapsedTime {
-    if (timeout == null || timeout > _timeoutConfiguration.fastOperation) {
+    if (_stopwatch.elapsed.inSeconds > 2) {
       return getElapsedAsSeconds(_stopwatch.elapsed);
     }
     return getElapsedAsMilliseconds(_stopwatch.elapsed);
@@ -847,31 +815,23 @@ abstract class Status {
   void finish() {
     assert(_stopwatch.isRunning);
     _stopwatch.stop();
-    if (onFinish != null) {
-      onFinish();
-    }
+    onFinish?.call();
   }
 }
 
 /// A [SilentStatus] shows nothing.
 class SilentStatus extends Status {
   SilentStatus({
-    @required Duration timeout,
-    @required TimeoutConfiguration timeoutConfiguration,
-    @required Stopwatch stopwatch,
-    VoidCallback onFinish,
+    required Stopwatch stopwatch,
+    VoidCallback? onFinish,
   }) : super(
-    timeout: timeout,
     onFinish: onFinish,
-    timeoutConfiguration: timeoutConfiguration,
     stopwatch: stopwatch,
   );
 
   @override
   void finish() {
-    if (onFinish != null) {
-      onFinish();
-    }
+    onFinish?.call();
   }
 }
 
@@ -880,19 +840,13 @@ class SilentStatus extends Status {
 class SummaryStatus extends Status {
   SummaryStatus({
     this.message = '',
-    @required Duration timeout,
-    @required TimeoutConfiguration timeoutConfiguration,
-    @required Stopwatch stopwatch,
+    required Stopwatch stopwatch,
     this.padding = kDefaultStatusPadding,
-    VoidCallback onFinish,
-    Stdio stdio,
-  }) : assert(message != null),
-       assert(padding != null),
-       _stdio = stdio ?? globals.stdio,
+    VoidCallback? onFinish,
+    required Stdio stdio,
+  }) : _stdio = stdio,
        super(
-         timeout: timeout,
          onFinish: onFinish,
-         timeoutConfiguration: timeoutConfiguration,
          stopwatch: stopwatch,
         );
 
@@ -935,18 +889,9 @@ class SummaryStatus extends Status {
   }
 
   /// Prints a (minimum) 8 character padded time.
-  ///
-  /// If [timeout] is less than or equal to [kFastOperation], the time is in
-  /// seconds; otherwise, milliseconds. If the time is longer than [timeout],
-  /// appends "(!)" to the time.
-  ///
-  /// Examples: `    0.5s`, `   150ms`, ` 1,600ms`, `    3.1s (!)`
   void writeSummaryInformation() {
     assert(_messageShowingOnCurrentLine);
     _writeToStdOut(elapsedTime.padLeft(_kTimePadding));
-    if (seemsSlow) {
-      _writeToStdOut(' (!)');
-    }
   }
 
   @override
@@ -959,24 +904,16 @@ class SummaryStatus extends Status {
 
 /// An [AnsiSpinner] is a simple animation that does nothing but implement a
 /// terminal spinner. When stopped or canceled, the animation erases itself.
-///
-/// If the timeout expires, a customizable warning is shown (but the spinner
-/// continues otherwise unabated).
 class AnsiSpinner extends Status {
   AnsiSpinner({
-    @required Duration timeout,
-    @required TimeoutConfiguration timeoutConfiguration,
-    @required Stopwatch stopwatch,
-    @required Terminal terminal,
-    VoidCallback onFinish,
-    this.slowWarningCallback,
-    Stdio stdio,
-  }) : _stdio = stdio ?? globals.stdio,
+    required Stopwatch stopwatch,
+    required Terminal terminal,
+    VoidCallback? onFinish,
+    required Stdio stdio,
+  }) : _stdio = stdio,
        _terminal = terminal,
        super(
-         timeout: timeout,
          onFinish: onFinish,
-         timeoutConfiguration: timeoutConfiguration,
          stopwatch: stopwatch,
         );
 
@@ -988,20 +925,15 @@ class AnsiSpinner extends Status {
   bool timedOut = false;
 
   int ticks = 0;
-  Timer timer;
+  Timer? timer;
 
   // Windows console font has a limited set of Unicode characters.
   List<String> get _animation => !_terminal.supportsEmoji
       ? const <String>[r'-', r'\', r'|', r'/']
       : const <String>['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
 
-  static const String _defaultSlowWarning = '(This is taking an unexpectedly long time.)';
-  final SlowWarningCallback slowWarningCallback;
-
-  String _slowWarning = '';
-
   String get _currentAnimationFrame => _animation[ticks % _animation.length];
-  int get _currentLength => _currentAnimationFrame.length + _slowWarning.length;
+  int get _currentLength => _currentAnimationFrame.length;
   String get _backspace => _backspaceChar * (spinnerIndent + _currentLength);
   String get _clear => _clearChar *  (spinnerIndent + _currentLength);
 
@@ -1020,7 +952,7 @@ class AnsiSpinner extends Status {
   void _startSpinner() {
     _writeToStdOut(_clear); // for _callback to backspace over
     timer = Timer.periodic(const Duration(milliseconds: 100), _callback);
-    _callback(timer);
+    _callback(timer!);
   }
 
   void _callback(Timer timer) {
@@ -1029,26 +961,14 @@ class AnsiSpinner extends Status {
     assert(timer.isActive);
     _writeToStdOut(_backspace);
     ticks += 1;
-    if (seemsSlow) {
-      if (!timedOut) {
-        timedOut = true;
-        _writeToStdOut('$_clear\n');
-      }
-      if (slowWarningCallback != null) {
-        _slowWarning = slowWarningCallback();
-      } else {
-        _slowWarning = _defaultSlowWarning;
-      }
-      _writeToStdOut(_slowWarning);
-    }
     _writeToStdOut('${_clearChar * spinnerIndent}$_currentAnimationFrame');
   }
 
   @override
   void finish() {
     assert(timer != null);
-    assert(timer.isActive);
-    timer.cancel();
+    assert(timer!.isActive);
+    timer?.cancel();
     timer = null;
     _clearSpinner();
     super.finish();
@@ -1061,15 +981,15 @@ class AnsiSpinner extends Status {
   @override
   void pause() {
     assert(timer != null);
-    assert(timer.isActive);
+    assert(timer!.isActive);
     _clearSpinner();
-    timer.cancel();
+    timer?.cancel();
   }
 
   @override
   void resume() {
     assert(timer != null);
-    assert(!timer.isActive);
+    assert(!timer!.isActive);
     _startSpinner();
   }
 }
@@ -1087,20 +1007,16 @@ class AnsiStatus extends AnsiSpinner {
     this.message = '',
     this.multilineOutput = false,
     this.padding = kDefaultStatusPadding,
-    @required Duration timeout,
-    @required Stopwatch stopwatch,
-    @required Terminal terminal,
-    VoidCallback onFinish,
-    Stdio stdio,
-    TimeoutConfiguration timeoutConfiguration,
+    required Stopwatch stopwatch,
+    required Terminal terminal,
+    VoidCallback? onFinish,
+    required Stdio stdio,
   }) : assert(message != null),
        assert(multilineOutput != null),
        assert(padding != null),
        super(
-         timeout: timeout,
          onFinish: onFinish,
          stdio: stdio,
-         timeoutConfiguration: timeoutConfiguration,
          stopwatch: stopwatch,
          terminal: terminal,
         );
@@ -1114,7 +1030,7 @@ class AnsiStatus extends AnsiSpinner {
   @override
   int get spinnerIndent => _kTimePadding - 1;
 
-  int _totalMessageLength;
+  int _totalMessageLength = 0;
 
   @override
   void start() {
@@ -1152,9 +1068,6 @@ class AnsiStatus extends AnsiSpinner {
       _writeToStdOut('\n${'$message Done'.padRight(padding)}$_margin');
     }
     _writeToStdOut(elapsedTime.padLeft(_kTimePadding));
-    if (seemsSlow) {
-      _writeToStdOut(' (!)');
-    }
   }
 
   void _clearStatus() {

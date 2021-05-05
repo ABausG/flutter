@@ -70,7 +70,7 @@ class Visibility extends StatelessWidget {
        assert(maintainSize != null),
        assert(
          maintainState == true || maintainAnimation == false,
-         'Cannot maintain animations if the state is not also maintained.'
+         'Cannot maintain animations if the state is not also maintained.',
        ),
        assert(
          maintainAnimation == true || maintainSize == false,
@@ -88,7 +88,7 @@ class Visibility extends StatelessWidget {
 
   /// The widget to show or hide, as controlled by [visible].
   ///
-  /// {@macro flutter.widgets.child}
+  /// {@macro flutter.widgets.ProxyWidget.child}
   final Widget child;
 
   /// The widget to use when the child is not [visible], assuming that none of

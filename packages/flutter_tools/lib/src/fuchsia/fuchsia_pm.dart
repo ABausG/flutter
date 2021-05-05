@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// @dart = 2.8
+
 import '../base/common.dart';
 import '../base/file_system.dart';
 import '../base/io.dart';
@@ -31,19 +33,6 @@ class FuchsiaPM {
     ]);
   }
 
-  /// Generates a new private key to be used to sign a Fuchsia package.
-  ///
-  /// [buildPath] should be the same [buildPath] passed to [init].
-  Future<bool> genkey(String buildPath, String outKeyPath) {
-    return _runPMCommand(<String>[
-      '-o',
-      buildPath,
-      '-k',
-      outKeyPath,
-      'genkey',
-    ]);
-  }
-
   /// Updates, signs, and seals a Fuchsia package.
   ///
   /// [buildPath] should be the same [buildPath] passed to [init].
@@ -59,12 +48,10 @@ class FuchsiaPM {
   ///
   /// where $APPNAME is the same [appName] passed to [init], and meta/package
   /// is set up to be the file `meta/package` created by [init].
-  Future<bool> build(String buildPath, String keyPath, String manifestPath) {
+  Future<bool> build(String buildPath, String manifestPath) {
     return _runPMCommand(<String>[
       '-o',
       buildPath,
-      '-k',
-      keyPath,
       '-m',
       manifestPath,
       'build',
@@ -78,12 +65,10 @@ class FuchsiaPM {
   ///
   /// [buildPath] should be the same path passed to [init], and [manifestPath]
   /// should be the same manifest passed to [build].
-  Future<bool> archive(String buildPath, String keyPath, String manifestPath) {
+  Future<bool> archive(String buildPath, String manifestPath) {
     return _runPMCommand(<String>[
       '-o',
       buildPath,
-      '-k',
-      keyPath,
       '-m',
       manifestPath,
       'archive',
@@ -104,7 +89,7 @@ class FuchsiaPM {
   ///
   /// The argument [repoPath] should have previously been an argument to
   /// [newrepo]. The [host] should be the host reported by
-  /// [FuchsiaDevFinder.resolve], and [port] should be an unused port for the
+  /// [FuchsiaDevFinder.resolve] or [FuchsiaFfx.resolve] and [port] should be an unused port for the
   /// http server to bind.
   Future<Process> serve(String repoPath, String host, int port) async {
     if (globals.fuchsiaArtifacts.pm == null) {
@@ -121,7 +106,7 @@ class FuchsiaPM {
       '-l',
       '$host:$port',
     ];
-    final Process process = await processUtils.start(command);
+    final Process process = await globals.processUtils.start(command);
     process.stdout
         .transform(utf8.decoder)
         .transform(const LineSplitter())
@@ -155,7 +140,7 @@ class FuchsiaPM {
       throwToolExit('Fuchsia pm tool not found');
     }
     final List<String> command = <String>[globals.fuchsiaArtifacts.pm.path, ...args];
-    final RunResult result = await processUtils.run(command);
+    final RunResult result = await globals.processUtils.run(command);
     return result.exitCode == 0;
   }
 }
@@ -243,7 +228,7 @@ class FuchsiaPackageServer {
     if (_process == null) {
       return false;
     }
-    return await fuchsiaSdk.fuchsiaPM.publish(_repo, package.path);
+    return fuchsiaSdk.fuchsiaPM.publish(_repo, package.path);
   }
 
   @override

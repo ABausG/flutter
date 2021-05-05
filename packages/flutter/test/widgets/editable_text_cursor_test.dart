@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+@TestOn('!chrome')
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 
 import '../rendering/mock_canvas.dart';
@@ -48,6 +48,7 @@ void main() {
   });
 
   testWidgets('cursor layout has correct width', (WidgetTester tester) async {
+    EditableText.debugDeterministicCursor = true;
     final GlobalKey<EditableTextState> editableTextKey = GlobalKey<EditableTextState>();
 
     late String changedValue;
@@ -87,8 +88,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Paste'));
-    // Wait for cursor to appear.
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
 
     expect(changedValue, clipboardContent);
 
@@ -96,6 +96,7 @@ void main() {
       find.byKey(const ValueKey<int>(1)),
       matchesGoldenFile('editable_text_test.0.png'),
     );
+    EditableText.debugDeterministicCursor = false;
   });
 
   testWidgets('cursor layout has correct radius', (WidgetTester tester) async {
@@ -321,6 +322,81 @@ void main() {
 
     EditableText.debugDeterministicCursor = false;
   });
+
+  testWidgets('Cursor animation restarts when it is moved using keys on desktop', (WidgetTester tester) async {
+    const String testText = 'Some text long enough to move the cursor around';
+    final TextEditingController controller = TextEditingController(text: testText);
+    final Widget widget = MaterialApp(
+      home: EditableText(
+        controller: controller,
+        focusNode: FocusNode(),
+        style: const TextStyle(fontSize: 20.0),
+        maxLines: 1,
+        cursorColor: Colors.blue,
+        backgroundCursorColor: Colors.grey,
+        cursorOpacityAnimates: false,
+        selectionControls: materialTextSelectionControls,
+        keyboardType: TextInputType.text,
+        textAlign: TextAlign.left,
+      ),
+    );
+    await tester.pumpWidget(widget);
+
+    await tester.tap(find.byType(EditableText));
+    await tester.pump();
+
+    final EditableTextState editableTextState = tester.firstState(find.byType(EditableText));
+    final RenderEditable renderEditable = editableTextState.renderEditable;
+
+    await tester.pump();
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    // Android cursor goes from exactly on to exactly off on the 500ms dot.
+    await tester.pump(const Duration(milliseconds: 499));
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+
+    await tester.pump();
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.pump(const Duration(milliseconds: 299));
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+
+    await tester.pump();
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.pump(const Duration(milliseconds: 299));
+    expect(renderEditable.cursorColor!.alpha, 255);
+    expect(renderEditable, paints..rect(color: const Color(0xff2196f3)));
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(renderEditable.cursorColor!.alpha, 0);
+    expect(renderEditable, paintsExactlyCountTimes(#drawRect, 0));
+  }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.macOS }));
 
   testWidgets('Cursor does not show when showCursor set to false', (WidgetTester tester) async {
     const Widget widget = MaterialApp(
@@ -712,6 +788,7 @@ void main() {
   }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS,  TargetPlatform.macOS }));
 
   testWidgets('cursor layout', (WidgetTester tester) async {
+    EditableText.debugDeterministicCursor = true;
     final GlobalKey<EditableTextState> editableTextKey = GlobalKey<EditableTextState>();
 
     late String changedValue;
@@ -756,8 +833,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Paste'));
-    // Wait for cursor to appear.
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
 
     expect(changedValue, clipboardContent);
 
@@ -765,9 +841,11 @@ void main() {
       find.byKey(const ValueKey<int>(1)),
       matchesGoldenFile('editable_text_test.2.png'),
     );
+    EditableText.debugDeterministicCursor = false;
   }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS,  TargetPlatform.macOS }));
 
   testWidgets('cursor layout has correct height', (WidgetTester tester) async {
+    EditableText.debugDeterministicCursor = true;
     final GlobalKey<EditableTextState> editableTextKey = GlobalKey<EditableTextState>();
 
     late String changedValue;
@@ -813,8 +891,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Paste'));
-    // Wait for cursor to appear.
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
 
     expect(changedValue, clipboardContent);
 
@@ -822,5 +899,6 @@ void main() {
       find.byKey(const ValueKey<int>(1)),
       matchesGoldenFile('editable_text_test.3.png'),
     );
+    EditableText.debugDeterministicCursor = false;
   }, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS,  TargetPlatform.macOS }));
 }

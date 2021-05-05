@@ -11,7 +11,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
 import 'constants.dart';
 import 'debug.dart';
@@ -167,6 +166,10 @@ class Slider extends StatefulWidget {
        assert(divisions == null || divisions > 0),
        super(key: key);
 
+  /// Creates an adaptive [Slider] based on the target platform, following
+  /// Material design's
+  /// [Cross-platform guidelines](https://material.io/design/platform-guidance/cross-platform-adaptation.html).
+  ///
   /// Creates a [CupertinoSlider] if the target platform is iOS, creates a
   /// Material Design slider otherwise.
   ///
@@ -550,7 +553,7 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
 
   void _actionHandler(_AdjustSliderIntent intent) {
     final _RenderSlider renderSlider = _renderObjectKey.currentContext!.findRenderObject()! as _RenderSlider;
-    final TextDirection textDirection = Directionality.of(_renderObjectKey.currentContext!)!;
+    final TextDirection textDirection = Directionality.of(_renderObjectKey.currentContext!);
     switch (intent.type) {
       case _SliderAdjustmentType.right:
         switch (textDirection) {
@@ -620,7 +623,7 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
         return _buildMaterialSlider(context);
 
       case _SliderType.adaptive: {
-        final ThemeData theme = Theme.of(context)!;
+        final ThemeData theme = Theme.of(context);
         assert(theme.platform != null);
         switch (theme.platform) {
           case TargetPlatform.android:
@@ -637,7 +640,7 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
   }
 
   Widget _buildMaterialSlider(BuildContext context) {
-    final ThemeData theme = Theme.of(context)!;
+    final ThemeData theme = Theme.of(context);
     SliderThemeData sliderTheme = SliderTheme.of(context);
 
     // If the widget has active or inactive colors specified, then we plug them
@@ -703,10 +706,11 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
     // This size is used as the max bounds for the painting of the value
     // indicators It must be kept in sync with the function with the same name
     // in range_slider.dart.
-    Size _screenSize() => MediaQuery.of(context)!.size;
+    Size _screenSize() => MediaQuery.of(context).size;
 
     return Semantics(
       container: true,
+      slider: true,
       child: FocusableActionDetector(
         actions: _actionMap,
         shortcuts: _shortcutMap,
@@ -724,7 +728,7 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
             divisions: widget.divisions,
             label: widget.label,
             sliderTheme: sliderTheme,
-            textScaleFactor: MediaQuery.of(context)!.textScaleFactor,
+            textScaleFactor: MediaQuery.of(context).textScaleFactor,
             screenSize: _screenSize(),
             onChanged: (widget.onChanged != null) && (widget.max > widget.min) ? _handleChanged : null,
             onChangeStart: widget.onChangeStart != null ? _handleDragStart : null,
@@ -824,9 +828,9 @@ class _SliderRenderObjectWidget extends LeafRenderObjectWidget {
       onChangeStart: onChangeStart,
       onChangeEnd: onChangeEnd,
       state: state,
-      textDirection: Directionality.of(context)!,
+      textDirection: Directionality.of(context),
       semanticFormatterCallback: semanticFormatterCallback,
-      platform: Theme.of(context)!.platform,
+      platform: Theme.of(context).platform,
       hasFocus: hasFocus,
       hovering: hovering,
     );
@@ -846,9 +850,9 @@ class _SliderRenderObjectWidget extends LeafRenderObjectWidget {
       ..onChanged = onChanged
       ..onChangeStart = onChangeStart
       ..onChangeEnd = onChangeEnd
-      ..textDirection = Directionality.of(context)!
+      ..textDirection = Directionality.of(context)
       ..semanticFormatterCallback = semanticFormatterCallback
-      ..platform = Theme.of(context)!.platform
+      ..platform = Theme.of(context).platform
       ..hasFocus = hasFocus
       ..hovering = hovering;
     // Ticker provider cannot change since there's a 1:1 relationship between
@@ -1226,9 +1230,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       // We supply the *current* value as the start location, so that if we have
       // a tap, it consists of a call to onChangeStart with the previous value and
       // a call to onChangeEnd with the new value.
-      if (onChangeStart != null) {
-        onChangeStart!(_discretize(value));
-      }
+      onChangeStart?.call(_discretize(value));
       _currentDragValue = _getValueFromGlobalPosition(globalPosition);
       onChanged!(_discretize(_currentDragValue));
       _state.overlayController.forward();
@@ -1252,9 +1254,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     }
 
     if (_active && _state.mounted) {
-      if (onChangeEnd != null) {
-        onChangeEnd!(_discretize(_currentDragValue));
-      }
+      onChangeEnd?.call(_discretize(_currentDragValue));
       _active = false;
       _currentDragValue = 0.0;
       _state.overlayController.reverse();
@@ -1329,8 +1329,8 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   bool get sizedByParent => true;
 
   @override
-  void performResize() {
-    size = Size(
+  Size computeDryLayout(BoxConstraints constraints) {
+    return Size(
       constraints.hasBoundedWidth ? constraints.maxWidth : _minPreferredTrackWidth + _maxSliderPartWidth,
       constraints.hasBoundedHeight ? constraints.maxHeight : math.max(_minPreferredTrackHeight, _maxSliderPartHeight),
     );
@@ -1385,6 +1385,8 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         sliderTheme: _sliderTheme,
         textDirection: _textDirection,
         value: _value,
+        textScaleFactor: _textScaleFactor,
+        sizeWithOverflow: screenSize.isEmpty ? size : screenSize,
       );
     }
 
@@ -1451,8 +1453,9 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       parentBox: this,
       sliderTheme: _sliderTheme,
       textDirection: _textDirection,
-      sizeWithOverflow: screenSize.isEmpty ? size : screenSize,
       value: _value,
+      textScaleFactor: textScaleFactor,
+      sizeWithOverflow: screenSize.isEmpty ? size : screenSize,
     );
   }
 
@@ -1506,7 +1509,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
 class _AdjustSliderIntent extends Intent {
   const _AdjustSliderIntent({
-    required this.type
+    required this.type,
   });
 
   const _AdjustSliderIntent.right() : type = _SliderAdjustmentType.right;
@@ -1577,8 +1580,11 @@ class _RenderValueIndicator extends RenderBox with RelayoutWhenSystemFontsChange
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    if (_state.paintValueIndicator != null) {
-      _state.paintValueIndicator!(context, offset);
-    }
+    _state.paintValueIndicator?.call(context, offset);
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    return constraints.smallest;
   }
 }

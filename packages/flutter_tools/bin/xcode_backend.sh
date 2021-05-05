@@ -115,8 +115,7 @@ is set to release or run \"flutter build ios --release\", then re-run Archive fr
   local framework_path="${FLUTTER_ROOT}/bin/cache/artifacts/engine/${artifact_variant}"
   local flutter_engine_flag=""
   local local_engine_flag=""
-  local flutter_framework="${framework_path}/Flutter.framework"
-  local flutter_podspec="${framework_path}/Flutter.podspec"
+  local flutter_framework="${framework_path}/Flutter.xcframework"
 
   if [[ -n "$FLUTTER_ENGINE" ]]; then
     flutter_engine_flag="--local-engine-src-path=${FLUTTER_ENGINE}"
@@ -136,25 +135,17 @@ is set to release or run \"flutter build ios --release\", then re-run Archive fr
       exit -1
     fi
     local_engine_flag="--local-engine=${LOCAL_ENGINE}"
-    flutter_framework="${FLUTTER_ENGINE}/out/${LOCAL_ENGINE}/Flutter.framework"
-    flutter_podspec="${FLUTTER_ENGINE}/out/${LOCAL_ENGINE}/Flutter.podspec"
+    flutter_framework="${FLUTTER_ENGINE}/out/${LOCAL_ENGINE}/Flutter.xcframework"
   fi
-
   local bitcode_flag=""
-  if [[ "$ENABLE_BITCODE" == "YES" ]]; then
+  if [[ "$ENABLE_BITCODE" == "YES" && "$ACTION" == "install" ]]; then
     bitcode_flag="true"
   fi
 
-  # TODO(jonahwilliams): move engine copying to build system.
+  # TODO(jmagman): use assemble copied engine in add-to-app.
   if [[ -e "${project_path}/.ios" ]]; then
-    RunCommand rm -rf -- "${derived_dir}/engine"
-    mkdir "${derived_dir}/engine"
-    RunCommand cp -r -- "${flutter_podspec}" "${derived_dir}/engine"
+    RunCommand rm -rf -- "${derived_dir}/engine/Flutter.framework"
     RunCommand cp -r -- "${flutter_framework}" "${derived_dir}/engine"
-  else
-    RunCommand rm -rf -- "${derived_dir}/Flutter.framework"
-    RunCommand cp -- "${flutter_podspec}" "${derived_dir}"
-    RunCommand cp -r -- "${flutter_framework}" "${derived_dir}"
   fi
 
   RunCommand pushd "${project_path}" > /dev/null
@@ -174,22 +165,30 @@ is set to release or run \"flutter build ios --release\", then re-run Archive fr
     code_size_directory="-dCodeSizeDirectory=${CODE_SIZE_DIRECTORY}"
   fi
 
+  local codesign_identity_flag=""
+  if [[ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" && "${CODE_SIGNING_REQUIRED:-}" != "NO" ]]; then
+    codesign_identity_flag="-dCodesignIdentity=${EXPANDED_CODE_SIGN_IDENTITY}"
+  fi
+
   RunCommand "${FLUTTER_ROOT}/bin/flutter"                                \
     ${verbose_flag}                                                       \
     ${flutter_engine_flag}                                                \
     ${local_engine_flag}                                                  \
     assemble                                                              \
-    --output="${derived_dir}/"                                            \
+    --no-version-check                                                    \
+    --output="${BUILT_PRODUCTS_DIR}/"                                     \
     ${performance_measurement_option}                                     \
     -dTargetPlatform=ios                                                  \
     -dTargetFile="${target_path}"                                         \
     -dBuildMode=${build_mode}                                             \
     -dIosArchs="${ARCHS}"                                                 \
+    -dSdkRoot="${SDKROOT}"                                                \
     -dSplitDebugInfo="${SPLIT_DEBUG_INFO}"                                \
     -dTreeShakeIcons="${TREE_SHAKE_ICONS}"                                \
     -dTrackWidgetCreation="${TRACK_WIDGET_CREATION}"                      \
     -dDartObfuscation="${DART_OBFUSCATION}"                               \
     -dEnableBitcode="${bitcode_flag}"                                     \
+    "${codesign_identity_flag}"                                           \
     ${bundle_sksl_path}                                                   \
     ${code_size_directory}                                                \
     --ExtraGenSnapshotOptions="${EXTRA_GEN_SNAPSHOT_OPTIONS}"             \
@@ -210,115 +209,18 @@ is set to release or run \"flutter build ios --release\", then re-run Archive fr
   return 0
 }
 
-# Returns the CFBundleExecutable for the specified framework directory.
-GetFrameworkExecutablePath() {
-  local framework_dir="$1"
-
-  local plist_path="${framework_dir}/Info.plist"
-  local executable="$(defaults read "${plist_path}" CFBundleExecutable)"
-  echo "${framework_dir}/${executable}"
-}
-
-# Destructively thins the specified executable file to include only the
-# specified architectures.
-LipoExecutable() {
-  local executable="$1"
-  shift
-  # Split $@ into an array.
-  read -r -a archs <<< "$@"
-
-  # Extract architecture-specific framework executables.
-  local all_executables=()
-  for arch in "${archs[@]}"; do
-    local output="${executable}_${arch}"
-    local lipo_info="$(lipo -info "${executable}")"
-    if [[ "${lipo_info}" == "Non-fat file:"* ]]; then
-      if [[ "${lipo_info}" != *"${arch}" ]]; then
-        echo "Non-fat binary ${executable} is not ${arch}. Running lipo -info:"
-        echo "${lipo_info}"
-        exit 1
-      fi
-    else
-      if lipo -output "${output}" -extract "${arch}" "${executable}"; then
-        all_executables+=("${output}")
-      else
-        echo "Failed to extract ${arch} for ${executable}. Running lipo -info:"
-        lipo -info "${executable}"
-        exit 1
-      fi
-    fi
-  done
-
-  # Generate a merged binary from the architecture-specific executables.
-  # Skip this step for non-fat executables.
-  if [[ ${#all_executables[@]} > 0 ]]; then
-    local merged="${executable}_merged"
-    lipo -output "${merged}" -create "${all_executables[@]}"
-
-    cp -f -- "${merged}" "${executable}" > /dev/null
-    rm -f -- "${merged}" "${all_executables[@]}"
-  fi
-}
-
-# Destructively thins the specified framework to include only the specified
-# architectures.
-ThinFramework() {
-  local framework_dir="$1"
-  shift
-
-  local executable="$(GetFrameworkExecutablePath "${framework_dir}")"
-  LipoExecutable "${executable}" "$@"
-}
-
-ThinAppFrameworks() {
-  local xcode_frameworks_dir="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
-
-  [[ -d "${xcode_frameworks_dir}" ]] || return 0
-  find "${xcode_frameworks_dir}" -type d -name "*.framework" | while read framework_dir; do
-    ThinFramework "$framework_dir" "$ARCHS"
-  done
-}
-
 # Adds the App.framework as an embedded binary and the flutter_assets as
 # resources.
 EmbedFlutterFrameworks() {
-  local project_path="${SOURCE_ROOT}/.."
-  if [[ -n "$FLUTTER_APPLICATION_PATH" ]]; then
-    project_path="${FLUTTER_APPLICATION_PATH}"
-  fi
-
-  # Prefer the hidden .ios folder, but fallback to a visible ios folder if .ios
-  # doesn't exist.
-  local flutter_ios_out_folder="${project_path}/.ios/Flutter"
-  local flutter_ios_engine_folder="${project_path}/.ios/Flutter/engine"
-  if [[ ! -d ${flutter_ios_out_folder} ]]; then
-    flutter_ios_out_folder="${project_path}/ios/Flutter"
-    flutter_ios_engine_folder="${project_path}/ios/Flutter"
-  fi
-
-  AssertExists "${flutter_ios_out_folder}"
-
   # Embed App.framework from Flutter into the app (after creating the Frameworks directory
   # if it doesn't already exist).
   local xcode_frameworks_dir="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
   RunCommand mkdir -p -- "${xcode_frameworks_dir}"
-  RunCommand rsync -av --delete "${flutter_ios_out_folder}/App.framework" "${xcode_frameworks_dir}"
+  RunCommand rsync -av --delete --filter "- .DS_Store" "${BUILT_PRODUCTS_DIR}/App.framework" "${xcode_frameworks_dir}"
 
   # Embed the actual Flutter.framework that the Flutter app expects to run against,
   # which could be a local build or an arch/type specific build.
-
-  # Copy Xcode behavior and don't copy over headers or modules.
-  RunCommand rsync -av --delete --filter "- .DS_Store/" --filter "- Headers/" --filter "- Modules/" "${flutter_ios_engine_folder}/Flutter.framework" "${xcode_frameworks_dir}/"
-  if [[ "$ACTION" != "install" || "$ENABLE_BITCODE" == "NO" ]]; then
-    # Strip bitcode from the destination unless archiving, or if bitcode is disabled entirely.
-    RunCommand "${DT_TOOLCHAIN_DIR}"/usr/bin/bitcode_strip "${flutter_ios_engine_folder}/Flutter.framework/Flutter" -r -o "${xcode_frameworks_dir}/Flutter.framework/Flutter"
-  fi
-
-  # Sign the binaries we moved.
-  if [[ -n "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]]; then
-    RunCommand codesign --force --verbose --sign "${EXPANDED_CODE_SIGN_IDENTITY}" -- "${xcode_frameworks_dir}/App.framework/App"
-    RunCommand codesign --force --verbose --sign "${EXPANDED_CODE_SIGN_IDENTITY}" -- "${xcode_frameworks_dir}/Flutter.framework/Flutter"
-  fi
+  RunCommand rsync -av --delete --filter "- .DS_Store" "${BUILT_PRODUCTS_DIR}/Flutter.framework" "${xcode_frameworks_dir}/"
 
   AddObservatoryBonjourService
 }
@@ -333,8 +235,10 @@ AddObservatoryBonjourService() {
   local built_products_plist="${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}"
 
   if [[ ! -f "${built_products_plist}" ]]; then
-    EchoError "error: ${INFOPLIST_PATH} does not exist. The Flutter \"Thin Binary\" build phase must run after \"Copy Bundle Resources\"."
-    exit -1
+    # Very occasionally Xcode hasn't created an Info.plist when this runs.
+    # The file will be present on re-run.
+    echo "${INFOPLIST_PATH} does not exist. Skipping _dartobservatory._tcp NSBonjourServices insertion. Try re-building to enable \"flutter attach\"."
+    return
   fi
   # If there are already NSBonjourServices specified by the app (uncommon), insert the observatory service name to the existing list.
   if plutil -extract NSBonjourServices xml1 -o - "${built_products_plist}"; then
@@ -351,11 +255,6 @@ AddObservatoryBonjourService() {
   fi
 }
 
-EmbedAndThinFrameworks() {
-  EmbedFlutterFrameworks
-  ThinAppFrameworks
-}
-
 # Main entry point.
 if [[ $# == 0 ]]; then
   # Named entry points were introduced in Flutter v0.0.7.
@@ -366,11 +265,13 @@ else
     "build")
       BuildApp ;;
     "thin")
-      ThinAppFrameworks ;;
+      # No-op, thinning is handled during the bundle asset assemble build target.
+      ;;
     "embed")
       EmbedFlutterFrameworks ;;
     "embed_and_thin")
-      EmbedAndThinFrameworks ;;
+      # Thinning is handled during the bundle asset assemble build target, so just embed.
+      EmbedFlutterFrameworks ;;
     "test_observatory_bonjour_service")
       # Exposed for integration testing only.
       AddObservatoryBonjourService ;;

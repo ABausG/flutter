@@ -7,8 +7,7 @@ import 'dart:convert' show utf8;
 import 'dart:convert' show jsonDecode;
 
 import 'package:flutter/services.dart';
-import 'package:flutter_test/flutter_test.dart' show TestWidgetsFlutterBinding;
-import '../flutter_test_alternative.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -199,7 +198,7 @@ void main() {
         'args': <dynamic>[
           1,
           jsonDecode(
-              '{"action": "actionCommand", "data": {\"input_context\" : \"abcdefg\"}}')
+              '{"action": "actionCommand", "data": {"input_context" : "abcdefg"}}')
         ],
         'method': 'TextInputClient.performPrivateCommand',
       });
@@ -215,7 +214,7 @@ void main() {
     test('TextInputClient performPrivateCommand method is called with float',
         () async {
       // Assemble a TextInputConnection so we can verify its change in state.
-      final FakeTextInputClient client = FakeTextInputClient(const TextEditingValue());
+      final FakeTextInputClient client = FakeTextInputClient(TextEditingValue.empty);
       const TextInputConfiguration configuration = TextInputConfiguration();
       TextInput.attach(client, configuration);
 
@@ -226,7 +225,7 @@ void main() {
         'args': <dynamic>[
           1,
           jsonDecode(
-              '{"action": "actionCommand", "data": {\"input_context\" : 0.5}}')
+              '{"action": "actionCommand", "data": {"input_context" : 0.5}}')
         ],
         'method': 'TextInputClient.performPrivateCommand',
       });
@@ -243,7 +242,7 @@ void main() {
         'TextInputClient performPrivateCommand method is called with CharSequence array',
         () async {
       // Assemble a TextInputConnection so we can verify its change in state.
-      final FakeTextInputClient client = FakeTextInputClient(const TextEditingValue());
+      final FakeTextInputClient client = FakeTextInputClient(TextEditingValue.empty);
       const TextInputConfiguration configuration = TextInputConfiguration();
       TextInput.attach(client, configuration);
 
@@ -254,7 +253,7 @@ void main() {
         'args': <dynamic>[
           1,
           jsonDecode(
-              '{"action": "actionCommand", "data": {\"input_context\" : ["abc", "efg"]}}')
+              '{"action": "actionCommand", "data": {"input_context" : ["abc", "efg"]}}')
         ],
         'method': 'TextInputClient.performPrivateCommand',
       });
@@ -271,7 +270,7 @@ void main() {
         'TextInputClient performPrivateCommand method is called with CharSequence',
         () async {
       // Assemble a TextInputConnection so we can verify its change in state.
-      final FakeTextInputClient client = FakeTextInputClient(const TextEditingValue());
+      final FakeTextInputClient client = FakeTextInputClient(TextEditingValue.empty);
       const TextInputConfiguration configuration = TextInputConfiguration();
       TextInput.attach(client, configuration);
 
@@ -283,7 +282,7 @@ void main() {
         'args': <dynamic>[
           1,
           jsonDecode(
-              '{"action": "actionCommand", "data": {\"input_context\" : "abc"}}')
+              '{"action": "actionCommand", "data": {"input_context" : "abc"}}')
         ],
         'method': 'TextInputClient.performPrivateCommand',
       });
@@ -300,7 +299,7 @@ void main() {
         'TextInputClient performPrivateCommand method is called with float array',
         () async {
       // Assemble a TextInputConnection so we can verify its change in state.
-      final FakeTextInputClient client = FakeTextInputClient(const TextEditingValue());
+      final FakeTextInputClient client = FakeTextInputClient(TextEditingValue.empty);
       const TextInputConfiguration configuration = TextInputConfiguration();
       TextInput.attach(client, configuration);
 
@@ -312,7 +311,7 @@ void main() {
         'args': <dynamic>[
           1,
           jsonDecode(
-              '{"action": "actionCommand", "data": {\"input_context\" : [0.5, 0.8]}}')
+              '{"action": "actionCommand", "data": {"input_context" : [0.5, 0.8]}}')
         ],
         'method': 'TextInputClient.performPrivateCommand',
       });
@@ -328,7 +327,7 @@ void main() {
     test('TextInputClient showAutocorrectionPromptRect method is called',
         () async {
       // Assemble a TextInputConnection so we can verify its change in state.
-      final FakeTextInputClient client = FakeTextInputClient(const TextEditingValue());
+      final FakeTextInputClient client = FakeTextInputClient(TextEditingValue.empty);
       const TextInputConfiguration configuration = TextInputConfiguration();
       TextInput.attach(client, configuration);
 
@@ -352,7 +351,7 @@ void main() {
 
   test('TextEditingValue.isComposingRangeValid', () async {
     // The composing range is empty.
-    expect(const TextEditingValue(text: '').isComposingRangeValid, isFalse);
+    expect(TextEditingValue.empty.isComposingRangeValid, isFalse);
 
     expect(
       const TextEditingValue(text: 'test', composing: TextRange(start: 1, end: 0)).isComposingRangeValid,
@@ -460,7 +459,7 @@ class FakeTextChannel implements MethodChannel {
 
 
   @override
-  void setMockMethodCallHandler(Future<void> Function(MethodCall call)? handler)  => throw UnimplementedError();
+  void setMockMethodCallHandler(Future<void>? Function(MethodCall call)? handler)  => throw UnimplementedError();
 
   @override
   bool checkMockMethodCallHandler(Future<void> Function(MethodCall call)? handler) => throw UnimplementedError();

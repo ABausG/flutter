@@ -7,7 +7,6 @@ import 'package:file/file.dart';
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
 
-import '../globals.dart' as globals;
 import 'common.dart';
 import 'file_system.dart';
 import 'io.dart';
@@ -17,13 +16,20 @@ import 'process.dart';
 
 abstract class OperatingSystemUtils {
   factory OperatingSystemUtils({
-    @required FileSystem fileSystem,
-    @required Logger logger,
-    @required Platform platform,
-    @required ProcessManager processManager,
+    required FileSystem fileSystem,
+    required Logger logger,
+    required Platform platform,
+    required ProcessManager processManager,
   }) {
     if (platform.isWindows) {
       return _WindowsUtils(
+        fileSystem: fileSystem,
+        logger: logger,
+        platform: platform,
+        processManager: processManager,
+      );
+    } else if (platform.isMacOS) {
+      return _MacOSUtils(
         fileSystem: fileSystem,
         logger: logger,
         platform: platform,
@@ -40,10 +46,10 @@ abstract class OperatingSystemUtils {
   }
 
   OperatingSystemUtils._private({
-    @required FileSystem fileSystem,
-    @required Logger logger,
-    @required Platform platform,
-    @required ProcessManager processManager,
+    required FileSystem fileSystem,
+    required Logger logger,
+    required Platform platform,
+    required ProcessManager processManager,
   }) : _fileSystem = fileSystem,
        _logger = logger,
        _platform = platform,
@@ -75,7 +81,7 @@ abstract class OperatingSystemUtils {
 
   /// Return the path (with symlinks resolved) to the given executable, or null
   /// if `which` was not able to locate the binary.
-  File which(String execName) {
+  File? which(String execName) {
     final List<File> result = _which(execName);
     if (result == null || result.isEmpty) {
       return null;
@@ -109,8 +115,10 @@ abstract class OperatingSystemUtils {
       'windows': 'Windows',
     };
     final String osName = _platform.operatingSystem;
-    return osNames.containsKey(osName) ? osNames[osName] : osName;
+    return osNames[osName] ?? osName;
   }
+
+  HostPlatform get hostPlatform;
 
   List<File> _which(String execName, { bool all = false });
 
@@ -125,7 +133,7 @@ abstract class OperatingSystemUtils {
   /// its intended user.
   Future<int> findFreePort({bool ipv6 = false}) async {
     int port = 0;
-    ServerSocket serverSocket;
+    ServerSocket? serverSocket;
     final InternetAddress loopback =
         ipv6 ? InternetAddress.loopbackIPv6 : InternetAddress.loopbackIPv4;
     try {
@@ -151,10 +159,10 @@ abstract class OperatingSystemUtils {
 
 class _PosixUtils extends OperatingSystemUtils {
   _PosixUtils({
-    @required FileSystem fileSystem,
-    @required Logger logger,
-    @required Platform platform,
-    @required ProcessManager processManager,
+    required FileSystem fileSystem,
+    required Logger logger,
+    required Platform platform,
+    required ProcessManager processManager,
   }) : super._private(
     fileSystem: fileSystem,
     logger: logger,
@@ -246,44 +254,118 @@ class _PosixUtils extends OperatingSystemUtils {
     return _fileSystem.file(path);
   }
 
-  String _name;
+  @override
+  String get pathVarSeparator => ':';
+
+  HostPlatform? _hostPlatform;
+
+  @override
+  HostPlatform get hostPlatform {
+    if (_hostPlatform == null) {
+      final RunResult hostPlatformCheck =
+          _processUtils.runSync(<String>['uname', '-m']);
+      // On x64 stdout is "uname -m: x86_64"
+      // On arm64 stdout is "uname -m: aarch64, arm64_v8a"
+      if (hostPlatformCheck.exitCode != 0) {
+        _logger.printError(
+          'Error trying to run uname -m'
+          '\nstdout: ${hostPlatformCheck.stdout}'
+          '\nstderr: ${hostPlatformCheck.stderr}',
+        );
+        _hostPlatform = HostPlatform.linux_x64;
+      } else if (hostPlatformCheck.stdout.trim().endsWith('x86_64')) {
+        _hostPlatform = HostPlatform.linux_x64;
+      } else {
+        _hostPlatform = HostPlatform.linux_arm64;
+      }
+    }
+    return _hostPlatform!;
+  }
+}
+
+class _MacOSUtils extends _PosixUtils {
+  _MacOSUtils({
+    required FileSystem fileSystem,
+    required Logger logger,
+    required Platform platform,
+    required ProcessManager processManager,
+  }) : super(
+          fileSystem: fileSystem,
+          logger: logger,
+          platform: platform,
+          processManager: processManager,
+        );
+
+  String? _name;
 
   @override
   String get name {
     if (_name == null) {
-      if (_platform.isMacOS) {
-        final List<RunResult> results = <RunResult>[
-          _processUtils.runSync(<String>['sw_vers', '-productName']),
-          _processUtils.runSync(<String>['sw_vers', '-productVersion']),
-          _processUtils.runSync(<String>['sw_vers', '-buildVersion']),
-          _processUtils.runSync(<String>['uname', '-m']),
-        ];
-        if (results.every((RunResult result) => result.exitCode == 0)) {
-          _name = '${results[0].stdout.trim()} ${results[1].stdout
-              .trim()} ${results[2].stdout.trim()} ${results[3].stdout.trim()}';
-        }
+      final List<RunResult> results = <RunResult>[
+        _processUtils.runSync(<String>['sw_vers', '-productName']),
+        _processUtils.runSync(<String>['sw_vers', '-productVersion']),
+        _processUtils.runSync(<String>['sw_vers', '-buildVersion']),
+      ];
+      if (results.every((RunResult result) => result.exitCode == 0)) {
+        _name =
+            '${results[0].stdout.trim()} ${results[1].stdout.trim()} ${results[2].stdout.trim()} ${getNameForHostPlatform(hostPlatform)}';
       }
       _name ??= super.name;
     }
-    return _name;
+    return _name!;
   }
 
+  // On ARM returns arm64, even when this process is running in Rosetta.
   @override
-  String get pathVarSeparator => ':';
+  HostPlatform get hostPlatform {
+    if (_hostPlatform == null) {
+      String? sysctlPath;
+      if (which('sysctl') == null) {
+        // Fallback to known install locations.
+        for (final String path in <String>[
+          '/usr/sbin/sysctl',
+          '/sbin/sysctl',
+        ]) {
+          if (_fileSystem.isFileSync(path)) {
+            sysctlPath = path;
+          }
+        }
+      } else {
+        sysctlPath = 'sysctl';
+      }
+
+      if (sysctlPath == null) {
+        throwToolExit('sysctl not found. Try adding it to your PATH environment variable.');
+      }
+      final RunResult arm64Check =
+          _processUtils.runSync(<String>[sysctlPath, 'hw.optional.arm64']);
+      // On arm64 stdout is "sysctl hw.optional.arm64: 1"
+      // On x86 hw.optional.arm64 is unavailable and exits with 1.
+      if (arm64Check.exitCode == 0 && arm64Check.stdout.trim().endsWith('1')) {
+        _hostPlatform = HostPlatform.darwin_arm;
+      } else {
+        _hostPlatform = HostPlatform.darwin_x64;
+      }
+    }
+    return _hostPlatform!;
+  }
 }
 
 class _WindowsUtils extends OperatingSystemUtils {
   _WindowsUtils({
-    @required FileSystem fileSystem,
-    @required Logger logger,
-    @required Platform platform,
-    @required ProcessManager processManager,
+    required FileSystem fileSystem,
+    required Logger logger,
+    required Platform platform,
+    required ProcessManager processManager,
   }) : super._private(
     fileSystem: fileSystem,
     logger: logger,
     platform: platform,
     processManager: processManager,
   );
+
+  @override
+  HostPlatform hostPlatform = HostPlatform.windows_x64;
 
   @override
   void makeExecutable(File file) {}
@@ -301,7 +383,7 @@ class _WindowsUtils extends OperatingSystemUtils {
       // `where` could be missing if system32 is not on the PATH.
       throwToolExit(
         'Cannot find the executable for `where`. This can happen if the System32 '
-        'folder (e.g. C:\\Windows\\System32 ) is removed from the PATH environment '
+        r'folder (e.g. C:\Windows\System32 ) is removed from the PATH environment '
         'variable. Ensure that this is present and then try again after restarting '
         'the terminal and/or IDE.'
       );
@@ -353,7 +435,7 @@ class _WindowsUtils extends OperatingSystemUtils {
     throw UnsupportedError('makePipe is not implemented on Windows.');
   }
 
-  String _name;
+  String? _name;
 
   @override
   String get name {
@@ -366,7 +448,7 @@ class _WindowsUtils extends OperatingSystemUtils {
         _name = super.name;
       }
     }
-    return _name;
+    return _name!;
   }
 
   @override
@@ -377,17 +459,40 @@ class _WindowsUtils extends OperatingSystemUtils {
 /// directory or the current working directory if none specified.
 /// Return null if the project root could not be found
 /// or if the project root is the flutter repository root.
-String findProjectRoot([ String directory ]) {
+String? findProjectRoot(FileSystem fileSystem, [ String? directory ]) {
   const String kProjectRootSentinel = 'pubspec.yaml';
-  directory ??= globals.fs.currentDirectory.path;
+  directory ??= fileSystem.currentDirectory.path;
   while (true) {
-    if (globals.fs.isFileSync(globals.fs.path.join(directory, kProjectRootSentinel))) {
+    if (fileSystem.isFileSync(fileSystem.path.join(directory!, kProjectRootSentinel))) {
       return directory;
     }
-    final String parent = globals.fs.path.dirname(directory);
+    final String parent = fileSystem.path.dirname(directory);
     if (directory == parent) {
       return null;
     }
     directory = parent;
+  }
+}
+
+enum HostPlatform {
+  darwin_x64,
+  darwin_arm,
+  linux_x64,
+  linux_arm64,
+  windows_x64,
+}
+
+String getNameForHostPlatform(HostPlatform platform) {
+  switch (platform) {
+    case HostPlatform.darwin_x64:
+      return 'darwin-x64';
+    case HostPlatform.darwin_arm:
+      return 'darwin-arm';
+    case HostPlatform.linux_x64:
+      return 'linux-x64';
+    case HostPlatform.linux_arm64:
+      return 'linux-arm64';
+    case HostPlatform.windows_x64:
+      return 'windows-x64';
   }
 }
