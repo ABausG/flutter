@@ -458,11 +458,19 @@ Map<String, String> parseXcodeBuildSettings(String showBuildSettingsOutput) {
 /// project and target.
 String substituteXcodeVariables(String str, Map<String, String> xcodeBuildSettings) {
   final Iterable<Match> matches = _varExpr.allMatches(str);
+  String value;
   if (matches.isEmpty) {
-    return str;
+    value = str;
+
+    globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID substituted isEmpty: $value');
+    return value;
   }
 
-  return str.replaceAllMapped(_varExpr, (Match m) => xcodeBuildSettings[m[1]] ?? m[0]);
+  value = str.replaceAllMapped(_varExpr, (Match m) => xcodeBuildSettings[m[1]] ?? m[0]);
+  globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID substitution: $str');
+  //globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID substitution buildSettings: $xcodeBuildSettings');
+  globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID substituted to: $value');
+  return value;
 }
 
 /// Information about an Xcode project.
@@ -520,8 +528,10 @@ class XcodeProjectInfo {
   static String expectedBuildConfigurationFor(BuildInfo buildInfo, String scheme) {
     final String baseConfiguration = _baseConfigurationFor(buildInfo);
     if (buildInfo.flavor == null) {
+      globals.logger.printStatus('XCODE_Build_Debugging: flavor is null in expectedBuildConfigurationFor $buildInfo');
       return baseConfiguration;
     }
+    globals.logger.printStatus('XCODE_Build_Debugging: flavor: ${buildInfo.flavor}. Will return ${baseConfiguration + '-$scheme'}');
     return baseConfiguration + '-$scheme';
   }
 
