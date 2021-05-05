@@ -502,7 +502,6 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
         // iOS tooling not found; likely not running OSX; let [fromPlist] be null
       }
       if (fromPlist != null && !fromPlist.contains(r'$')) {
-        globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID fromPlist: $fromPlist');
         // Info.plist has no build variables in product bundle ID.
         return fromPlist;
       }
@@ -511,10 +510,8 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
     if (allBuildSettings != null) {
       if (fromPlist != null) {
         // Perform variable substitution using build settings.
-        globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID substituteXcodeVariables: $fromPlist');
         return xcode.substituteXcodeVariables(fromPlist, allBuildSettings);
       }
-      globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID allBuildSettings: ${allBuildSettings['PRODUCT_BUNDLE_IDENTIFIER']}');
       return allBuildSettings['PRODUCT_BUNDLE_IDENTIFIER'];
     }
 
@@ -526,7 +523,6 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
     // best-effort is probably fine.
     final String fromPbxproj = _firstMatchInFile(xcodeProjectInfoFile, _productBundleIdPattern)?.group(2);
     if (fromPbxproj != null && (fromPlist == null || fromPlist == _productBundleIdVariable)) {
-      globals.logger.printStatus('XCODE_BUILD_DEBUGGING: BundleID fromPbxproj: $fromPbxproj');
       return fromPbxproj;
     }
 
@@ -564,7 +560,6 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
   ///
   /// Returns null, if iOS tooling is unavailable.
   Future<Map<String, String>> buildSettingsForBuildInfo(BuildInfo buildInfo) async {
-    globals.logger.printStatus('XCODE_BUILD_DEBUGGING: buildSettingsForBuildInfo');
     if (!existsSync()) {
       return null;
     }
@@ -575,7 +570,6 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
     }
 
     final String scheme = info.schemeFor(buildInfo);
-    globals.logger.printStatus('XCODE_BUILD_DEBUGGING: buildSettingsForBuildInfo.scheme: $scheme');
     if (scheme == null) {
       info.reportFlavorNotFoundAndExit();
     }
@@ -593,7 +587,6 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
   XcodeProjectInfo _projectInfo;
 
   Future<Map<String, String>> _xcodeProjectBuildSettings(String scheme) async {
-    globals.logger.printStatus('XCODE_BUILD_DEBUGGING: _xcodeProjectBuildSettings(scheme: $scheme)');
     if (!globals.xcodeProjectInterpreter.isInstalled) {
       return null;
     }
@@ -603,7 +596,6 @@ class IosProject extends FlutterProjectPlatform implements XcodeBasedProject {
     );
     if (buildSettings != null && buildSettings.isNotEmpty) {
       // No timeouts, flakes, or errors.
-      globals.logger.printStatus('XCODE_BUILD_DEBUGGING: _xcodeProjectBuildSettings(scheme: $scheme)[PRODUCT_BUNDLE_IDENTIFIER]${buildSettings[['PRODUCT_BUNDLE_IDENTIFIER']]}.');
       return buildSettings;
     }
     return null;
