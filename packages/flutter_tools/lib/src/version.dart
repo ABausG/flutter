@@ -828,7 +828,8 @@ class GitTagVersion {
 
   String frameworkVersionFor(String revision) {
     if (x == null || y == null || z == null || !revision.startsWith(hash)) {
-      return '0.0.0-unknown';
+      // Override this to enable some packages to properly run pub get
+      return '2.0.7-0.0.pre.3';
     }
     if (commits == 0) {
       return gitTag;
