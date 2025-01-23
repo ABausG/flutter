@@ -5,12 +5,15 @@
 @TestOn('!chrome')
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../widgets/feedback_tester.dart';
 import '../widgets/semantics_tester.dart';
@@ -123,6 +126,66 @@ void main() {
     );
   });
 
+  testWidgets('Material2 - respects 24 hours locale', (WidgetTester tester) async {
+    // Using German Country as an example of a 24 hour locale
+    const Locale localeWith24HourFormat = Locale('de', 'DE');
+    const LocalizationsDelegate<MaterialLocalizations> materialLocalizationsDelegate =
+        GlobalMaterialLocalizations.delegate;
+
+    await mediaQueryBoilerplate(
+      tester,
+      locale: localeWith24HourFormat,
+      materialLocalizations: materialLocalizationsDelegate,
+      materialType: MaterialType.material2,
+    );
+
+    final List<String> labels00To22 = List<String>.generate(12, (int index) {
+      return (index * 2).toString().padLeft(2, '0');
+    });
+    final CustomPaint dialPaint = tester.widget(findDialPaint);
+    final dynamic dialPainter = dialPaint.painter;
+    // ignore: avoid_dynamic_calls
+    final List<dynamic> primaryLabels = dialPainter.primaryLabels as List<dynamic>;
+    // ignore: avoid_dynamic_calls
+    expect(primaryLabels.map<String>((dynamic tp) => tp.painter.text.text as String), labels00To22);
+
+    // ignore: avoid_dynamic_calls
+    final List<dynamic> selectedLabels = dialPainter.selectedLabels as List<dynamic>;
+    expect(
+      // ignore: avoid_dynamic_calls
+      selectedLabels.map<String>((dynamic tp) => tp.painter.text.text as String),
+      labels00To22,
+    );
+  });
+
+  testWidgets('Material2 - 24 hours locale validates hour >= 12', (
+    WidgetTester tester,
+  ) async {
+    // Using German Country as an example of a 24 hour locale
+    const Locale localeWith24HourFormat = Locale('de', 'DE');
+    const LocalizationsDelegate<MaterialLocalizations> materialLocalizationsDelegate =
+        GlobalMaterialLocalizations.delegate;
+
+    final Completer<TimeOfDay?> timeCompleter = Completer<TimeOfDay?>();
+
+    await mediaQueryBoilerplate(tester,
+        locale: localeWith24HourFormat,
+        materialLocalizations: materialLocalizationsDelegate,
+        materialType: MaterialType.material2, onChanged: (TimeOfDay? selectedTime) {
+      timeCompleter.complete(selectedTime);
+    });
+
+    final Offset center = tester.getCenter(findDialPaint);
+    await tester.tapAt(Offset(center.dx - 50, center.dy));
+
+    final MaterialLocalizations materialLocalizations =
+        await materialLocalizationsDelegate.load(localeWith24HourFormat);
+    await tester.tap(find.text(materialLocalizations.okButtonLabel));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    expect(await timeCompleter.future, equals(const TimeOfDay(hour: 18, minute: 0)));
+  });
+
   testWidgets('Material3 - Dialog size - dial mode', (WidgetTester tester) async {
     addTearDown(tester.view.reset);
 
@@ -219,6 +282,74 @@ void main() {
     );
     // ignore: avoid_dynamic_calls
     expect(selectedLabels.map<bool>((dynamic tp) => tp.inner as bool), inner0To23);
+  });
+
+  testWidgets('Material3 - respects 24 hours locale', (
+    WidgetTester tester,
+  ) async {
+    // Using German Country as an example of a 24 hour locale
+    const Locale localeWith24HourFormat = Locale('de', 'DE');
+    const LocalizationsDelegate<MaterialLocalizations> materialLocalizationsDelegate =
+        GlobalMaterialLocalizations.delegate;
+
+    await mediaQueryBoilerplate(
+      tester,
+      locale: localeWith24HourFormat,
+      materialLocalizations: materialLocalizationsDelegate,
+      materialType: MaterialType.material3,
+    );
+
+    final List<String> labels00To23 = List<String>.generate(24, (int index) {
+      return index == 0 ? '00' : index.toString();
+    });
+    final List<bool> inner0To23 = List<bool>.generate(24, (int index) => index >= 12);
+
+    final CustomPaint dialPaint = tester.widget(findDialPaint);
+    final dynamic dialPainter = dialPaint.painter;
+    // ignore: avoid_dynamic_calls
+    final List<dynamic> primaryLabels = dialPainter.primaryLabels as List<dynamic>;
+    // ignore: avoid_dynamic_calls
+    expect(primaryLabels.map<String>((dynamic tp) => tp.painter.text.text as String), labels00To23);
+    // ignore: avoid_dynamic_calls
+    expect(primaryLabels.map<bool>((dynamic tp) => tp.inner as bool), inner0To23);
+
+    // ignore: avoid_dynamic_calls
+    final List<dynamic> selectedLabels = dialPainter.selectedLabels as List<dynamic>;
+    expect(
+      // ignore: avoid_dynamic_calls
+      selectedLabels.map<String>((dynamic tp) => tp.painter.text.text as String),
+      labels00To23,
+    );
+    // ignore: avoid_dynamic_calls
+    expect(selectedLabels.map<bool>((dynamic tp) => tp.inner as bool), inner0To23);
+  });
+
+  testWidgets('Material3 - 24 hours locale validates hour >= 12', (
+    WidgetTester tester,
+  ) async {
+    // Using German Country as an example of a 24 hour locale
+    const Locale localeWith24HourFormat = Locale('de', 'DE');
+    const LocalizationsDelegate<MaterialLocalizations> materialLocalizationsDelegate =
+        GlobalMaterialLocalizations.delegate;
+
+    final Completer<TimeOfDay?> timeCompleter = Completer<TimeOfDay?>();
+
+    await mediaQueryBoilerplate(tester,
+        locale: localeWith24HourFormat,
+        materialLocalizations: materialLocalizationsDelegate,
+        materialType: MaterialType.material3, onChanged: (TimeOfDay? selectedTime) {
+      timeCompleter.complete(selectedTime);
+    });
+
+    final Offset center = tester.getCenter(findDialPaint);
+    await tester.tapAt(Offset(center.dx - 40, center.dy));
+
+    final MaterialLocalizations materialLocalizations =
+        await materialLocalizationsDelegate.load(localeWith24HourFormat);
+    await tester.tap(find.text(materialLocalizations.okButtonLabel));
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+
+    expect(await timeCompleter.future, equals(const TimeOfDay(hour: 21, minute: 0)));
   });
 
   testWidgets('Material3 - Dial background uses correct default color', (
@@ -1994,6 +2125,93 @@ void main() {
         expect(hourField.focusNode!.hasFocus, isFalse);
         expect(minuteField.focusNode!.hasFocus, isFalse);
       });
+
+      group('24 hours', () {
+        testWidgets('respects MediaQueryData.alwaysUse24HourFormat == true',
+            (WidgetTester tester) async {
+          await mediaQueryBoilerplate(
+            tester,
+            alwaysUse24HourFormat: true,
+            entryMode: TimePickerEntryMode.input,
+            materialType: materialType,
+          );
+
+          expect(find.text(amString), findsNothing);
+          expect(find.text(pmString), findsNothing);
+        });
+
+        testWidgets('respects 24 hours locale', (WidgetTester tester) async {
+          // Using German Country as an example of a 24 hour locale
+          const Locale localeWith24HourFormat = Locale('de', 'DE');
+          const LocalizationsDelegate<MaterialLocalizations> materialLocalizationsDelegate =
+              GlobalMaterialLocalizations.delegate;
+
+          await mediaQueryBoilerplate(
+            tester,
+            locale: localeWith24HourFormat,
+            materialLocalizations: materialLocalizationsDelegate,
+            materialType: materialType,
+          );
+
+          expect(find.text(amString), findsNothing);
+          expect(find.text(pmString), findsNothing);
+        });
+
+        testWidgets('validates input with hour >= 12 using MediaQuery',
+            (WidgetTester tester) async {
+          final Completer<TimeOfDay?> timeCompleter = Completer<TimeOfDay?>();
+          await mediaQueryBoilerplate(
+            tester,
+            alwaysUse24HourFormat: true,
+            entryMode: TimePickerEntryMode.input,
+            materialType: materialType,
+            onChanged: (TimeOfDay? time) {
+              timeCompleter.complete(time);
+            },
+          );
+
+          await tester.enterText(find.byType(TextField).first, '21');
+          final MaterialLocalizations materialLocalizations = MaterialLocalizations.of(
+            tester.element(find.text('21')),
+          );
+          await tester.tap(find.text(materialLocalizations.okButtonLabel));
+          await tester.pumpAndSettle(const Duration(seconds: 1));
+
+          expect(await timeCompleter.future, equals(const TimeOfDay(hour: 21, minute: 0)));
+        });
+
+        testWidgets('validates input with hour >= 12 using 24 hours locale',
+            (WidgetTester tester) async {
+          const String errorInvalidText = 'Custom validation error';
+          final Completer<TimeOfDay?> timeCompleter = Completer<TimeOfDay?>();
+          // Using German Country as an example of a 24 hour locale
+          const Locale localeWith24HourFormat = Locale('de', 'DE');
+          const LocalizationsDelegate<MaterialLocalizations> materialLocalizationsDelegate =
+              GlobalMaterialLocalizations.delegate;
+
+          await mediaQueryBoilerplate(
+            tester,
+            locale: localeWith24HourFormat,
+            materialLocalizations: materialLocalizationsDelegate,
+            entryMode: TimePickerEntryMode.input,
+            materialType: materialType,
+            errorInvalidText: errorInvalidText,
+            onChanged: (TimeOfDay? time) {
+              timeCompleter.complete(time);
+            },
+          );
+
+          await tester.enterText(find.byType(TextField).first, '21');
+
+          final MaterialLocalizations materialLocalizations =
+              await materialLocalizationsDelegate.load(localeWith24HourFormat);
+          await tester.tap(find.text(materialLocalizations.okButtonLabel));
+          await tester.pumpAndSettle(const Duration(seconds: 1));
+
+          expect(find.text(errorInvalidText), findsNothing);
+          expect(await timeCompleter.future, equals(const TimeOfDay(hour: 21, minute: 0)));
+        });
+      });
     });
 
     group('Time picker - Restoration (${materialType.name})', () {
@@ -2204,14 +2422,18 @@ Future<void> mediaQueryBoilerplate(
   bool tapButton = true,
   required MaterialType materialType,
   Orientation? orientation,
+  Locale locale = const Locale('en', 'US'),
+  LocalizationsDelegate<MaterialLocalizations> materialLocalizations =
+      DefaultMaterialLocalizations.delegate,
+  ValueChanged<TimeOfDay?>? onChanged,
 }) async {
   await tester.pumpWidget(
     Theme(
       data: ThemeData(useMaterial3: materialType == MaterialType.material3),
       child: Localizations(
-        locale: const Locale('en', 'US'),
-        delegates: const <LocalizationsDelegate<dynamic>>[
-          DefaultMaterialLocalizations.delegate,
+        locale: locale,
+        delegates: <LocalizationsDelegate<dynamic>>[
+          materialLocalizations,
           DefaultWidgetsLocalizations.delegate,
         ],
         child: MediaQuery(
@@ -2230,8 +2452,8 @@ Future<void> mediaQueryBoilerplate(
                     return MaterialPageRoute<void>(
                       builder: (BuildContext context) {
                         return TextButton(
-                          onPressed: () {
-                            showTimePicker(
+                          onPressed: () async {
+                            final TimeOfDay? pickedTime = await showTimePicker(
                               context: context,
                               initialTime: initialTime,
                               initialEntryMode: entryMode,
@@ -2242,6 +2464,7 @@ Future<void> mediaQueryBoilerplate(
                               onEntryModeChanged: onEntryModeChange,
                               orientation: orientation,
                             );
+                            onChanged?.call(pickedTime);
                           },
                           child: const Text('X'),
                         );
